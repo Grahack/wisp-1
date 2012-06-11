@@ -5,17 +5,32 @@ object Main {
   def main(args: Array[String]) {
     println("Welcome to Wisp!")
 
-    var env = Environment()
+    // var env = Environment()
 
     while (true) {
-     try {
-        print("~> ")
-        val l = readLine()
-        val p = Reader.parse(l)
+      try {
+        var line = new String()
 
-        p.foreach { cell =>
-          println(Interpretter.eval(cell, env))
+        print("~> ")
+
+        var break = false;
+        while (!break) {
+          val l = readLine()
+
+          line = line + "\n" + l
+
+          if (l.isEmpty)
+            break = true
         }
+
+        val p = Reader.parse(line) // hack to get rid of leading \t
+
+        println(p)
+
+        //
+        //        p.foreach { cell =>
+        //          println(Interpretter.eval(cell, env))
+        //        }
 
       } catch {
         case e => println("Error, caught exception: " + e)
