@@ -1,11 +1,13 @@
 package wisp
 
+import scala.util.parsing.combinator.Parsers
+
 object Main {
 
   def main(args: Array[String]) {
-    println("Welcome to Wisp!")
+    println("Welcome to Wisp! Enter a blank line to evaluate. ")
 
-    // var env = Environment()
+    var env = Environment()
 
     while (true) {
       try {
@@ -25,12 +27,9 @@ object Main {
 
         val p = Reader.parse(line) // hack to get rid of leading \t
 
-        println(p)
-
-        //
-        //        p.foreach { cell =>
-        //          println(Interpretter.eval(cell, env))
-        //        }
+        p.foreach { cell =>
+          println(Eval.onAtom(cell, env))
+        }
 
       } catch {
         case e => println("Error, caught exception: " + e)

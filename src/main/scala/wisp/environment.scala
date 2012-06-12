@@ -1,30 +1,32 @@
 package wisp
 
-import scala.collection.mutable.Map
+object Environment {
 
-object GroundEnvironment extends Environment(Map(), List()) {
+  def apply() =
+    new Environment(Map[Symbol, Any](
+      'vau -> Vau,
+      'eval -> Eval,
+      'define -> Define,
+      'if -> If,
+      // normal funcs
+      Symbol(",") -> Id,
+      // list stuff
+      'head -> Head,
+      'tail -> Tail,
+      // io
+      'print -> Print,
+      // math
+      '- -> Subtract,
+      '+ -> Addition,
+      // misc
+      'author -> "Eric Springer"), None)
 
 }
 
-class Environment(
-  private val lookup: Map[Symbol, Any],
-  private val parents: List[Environment]) {
-
-  // TODO: what's the functional way of writing a DFS?
-  def get(s: Symbol): Option[Any] = {
-    if (lookup.contains(s))
-      return Some(lookup(s))
-    else
-      for (e <- parents) {
-        val x = e.get(s)
-        if (x.isDefined)
-          return x
-      }
-
-    return None
-
+class Environment(var map: Map[Symbol, Any], val parent: Option[Environment]) {
+  def get(s: Symbol): Any = map.get(s).orElse(parent.map(_.get(s))).getOrElse(sys.error("Was searching for symbol " + s + " but couldn't find it."))
+  def set(s: Symbol, value: Any) = {
+    map = map + ((s, value))
   }
-  
-  def add(s: Symbol, v: Any) = lookup.put(s, v)
-
+  def copyOnto(onto: Option[Environment]): Environment = new Environment(map, parent.map(_.copyOnto(onto)).orElse(onto))
 }

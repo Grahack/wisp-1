@@ -8,14 +8,28 @@ object Reader extends Parsers {
   type Elem = Char
 
   def parse(input: String) = {
-    rep(atomListParser(0))(new CharSequenceReader(input))
+    val p = rep(atomListParser(0))(new CharSequenceReader(input))
+
+    println("Debug: read in: " + p)
+
+    p match {
+      case s: Success[List[Any]] => s.result
+      case f: Failure => sys.error(f.toString)
+    }
   }
 
-  private def atomListParser(depth: Int): Parser[List[Any]] =
+  private def atomListParser(depth: Int): Parser[Any] =
     rep(eol) ~>
       repN(depth, '\t') ~>
       rep1sep(atomParser, rep1(' ')) ~
-      rep(eol ~> atomListParser(depth + 1)) ^^ (x => (x._1 ++ x._2))
+      rep(eol ~> atomListParser(depth + 1)) ^^ (x => {
+        val t = (x._1 ++ x._2)
+
+        if (t.length == 1)
+          t.head
+        else
+          t
+      })
 
   private def atomParser = intParser | quotedStringParser | symbolParser
 
