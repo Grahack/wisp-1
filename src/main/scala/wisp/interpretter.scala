@@ -8,7 +8,7 @@ object Interpretter {
 
   // Special forms
 
-  def vau(args: List[Any], env: Environment): (Any, Environment) =
+  def lambda(args: List[Any], env: Environment): (Any, Environment) =
     args match {
       case a :: e :: body :: Nil => {
         val argSymbol = a.asInstanceOf[Symbol]
@@ -40,23 +40,30 @@ object Interpretter {
 
   def define(args: List[Any], env: Environment): (Any, Environment) =
     args match {
-      case symbol :: value :: Nil => ((), env + ((symbol.asInstanceOf[Symbol], value)))
+      case symbol :: value :: Nil => (value, env + ((symbol.asInstanceOf[Symbol], value)))
       case _ => sys.error("define expected 2 arguments, got: " + args + " instead")
     }
-  
+
   def load(args: List[Any], env: Environment): (Any, Environment) = {
     require(args.length == 1) // todo map over, and load a list of strings
-    
+
     loadFromFile(args.head.asInstanceOf[String], env)
   }
 
   // helper functions
 
   def resolve(in: Any, env: Environment): (Any, Environment) = in match {
-    case l: List[_] => env(l.head.asInstanceOf[Symbol]).asInstanceOf[Procedure](l.tail, env)
+    case l: List[_] => evalList(l, env)
     case s: Symbol => (env(s), env)
     case x => (x, env)
   }
+
+  def evalList(in: List[Any], env: Environment): (Any, Environment) =
+    in.head match {
+      case l: List[_] => evalList(l, env)
+      case s: Symbol => env(s).asInstanceOf[Procedure](in.tail, env)
+      case _ => sys.error("Can't eval a list that doesn't start with a symbol")
+    }
 
   def loadFromFile(file: String, env: Environment): (Any, Environment) = {
 
@@ -64,8 +71,7 @@ object Interpretter {
     val lines = source.mkString
     source.close()
 
-
-    ((), Reader.parse(lines).foldLeft(env)( (e: Environment, l: Any) => resolve(l, e)._2 ))
+    ((), Reader.parse(lines).foldLeft(env)((e: Environment, l: Any) => resolve(l, e)._2))
   }
 
   def strict(args: List[Any], env: Environment)(f: List[Any] => Any) =

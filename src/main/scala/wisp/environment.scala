@@ -6,7 +6,7 @@ object Environment {
   def apply(): Map[Any, Any] =
     Map(
       // special forms
-      'vau -> vau _,
+      'lambda -> lambda _,
       'eval -> eval _,
       'define -> define _,
       'if -> ifProcedure _,

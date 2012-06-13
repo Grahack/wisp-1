@@ -8,23 +8,32 @@ object Main {
     println("Welcome to Wisp! Enter a blank line to evaluate. ")
 
     var env = Environment()
-
     var counter = 0
 
     while (true) {
       try {
-        var line = new String()
+        var line: String = ""
 
-        print("~> ")
+        var continue = true
+        var indent = 0
 
-        var break = false;
-        while (!break) {
+        while (continue) {
+          print("~> " + "\t" * indent)
           val l = readLine()
 
-          line = line + "\n" + l
+          line = line + "\n" + ("\t" * indent) + (
+            if (l.endsWith("\\")) {
+              indent = indent + 1
+              l.dropRight(1)
+            } else if (l.isEmpty) {
+              indent = indent - 1
+              l
+            } else {
+              l
+            })
 
-          if (l.isEmpty)
-            break = true
+          if (indent <= 0)
+            continue = false
         }
 
         val p = Reader.parse(line)
