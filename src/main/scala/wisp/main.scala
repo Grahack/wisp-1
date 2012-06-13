@@ -9,6 +9,8 @@ object Main {
 
     var env = Environment()
 
+    var counter = 0
+
     while (true) {
       try {
         var line = new String()
@@ -25,10 +27,20 @@ object Main {
             break = true
         }
 
-        val p = Reader.parse(line) // hack to get rid of leading \t
+        val p = Reader.parse(line)
 
         p.foreach { cell =>
-          println(Eval.onAtom(cell, env))
+          {
+            val r = Interpretter.resolve(cell, env)
+
+            counter = counter + 1
+
+            val nextV = Symbol(":v" + counter)
+            val nextE = Symbol(":e" + counter)
+            env = r._2 + (nextV, r._1) + (nextE, r._2)
+
+            println(nextV.toString + " = " + r._1)
+          }
         }
 
       } catch {

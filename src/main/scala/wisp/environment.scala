@@ -1,32 +1,30 @@
 package wisp
 
 object Environment {
+  import Interpretter._
 
   def apply() =
     new Environment(Map[Symbol, Any](
-      'vau -> Vau,
-      'eval -> Eval,
-      'define -> Define,
-      'if -> If,
+      'vau -> vau _,
+      'eval -> eval _,
+      'define -> define _,
+      'if -> ifProcedure _,
       // normal funcs
-      Symbol(",") -> Id,
       // list stuff
-      'head -> Head,
-      'tail -> Tail,
+  //    'head -> Head,
+  //    'tail -> Tail,
       // io
-      'print -> Print,
+ //     'print -> Print,
       // math
-      '- -> Subtract,
-      '+ -> Addition,
-      // misc
-      'author -> "Eric Springer"), None)
+ //     '- -> Subtract,
+      '+ -> addition _,
+      // misc */
+      'author -> "Eric Springer"))
 
 }
 
-class Environment(var map: Map[Symbol, Any], val parent: Option[Environment]) {
-  def get(s: Symbol): Any = map.get(s).orElse(parent.map(_.get(s))).getOrElse(sys.error("Was searching for symbol " + s + " but couldn't find it."))
-  def set(s: Symbol, value: Any) = {
-    map = map + ((s, value))
-  }
-  def copyOnto(onto: Option[Environment]): Environment = new Environment(map, parent.map(_.copyOnto(onto)).orElse(onto))
+class Environment(val map: Map[Symbol, Any]) {
+  def apply(s: Symbol): Any = map(s)
+  def +(s: Symbol, value: Any): Environment = new Environment((map + ((s, value))))
+  def ++(env: Environment): Environment = new Environment(map ++ env.map)
 }
