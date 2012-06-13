@@ -3,28 +3,25 @@ package wisp
 object Environment {
   import Interpretter._
 
-  def apply() =
-    new Environment(Map[Symbol, Any](
+  def apply(): Map[Any, Any] =
+    Map(
+      // special forms
       'vau -> vau _,
       'eval -> eval _,
       'define -> define _,
       'if -> ifProcedure _,
-      // normal funcs
       // list stuff
-  //    'head -> Head,
-  //    'tail -> Tail,
+      'head -> head _,
+      'tail -> tail _,
       // io
- //     'print -> Print,
+      'print -> printProc _,
+      'load -> load _,
       // math
- //     '- -> Subtract,
+      '- -> subtract _,
       '+ -> addition _,
       // misc */
-      'author -> "Eric Springer"))
+      'true -> true,
+      'false -> false,
+      'author -> "Eric Springer")
 
-}
-
-class Environment(val map: Map[Symbol, Any]) {
-  def apply(s: Symbol): Any = map(s)
-  def +(s: Symbol, value: Any): Environment = new Environment((map + ((s, value))))
-  def ++(env: Environment): Environment = new Environment(map ++ env.map)
 }

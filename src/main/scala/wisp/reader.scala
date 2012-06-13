@@ -10,8 +10,6 @@ object Reader extends Parsers {
   def parse(input: String) = {
     val p = rep(atomListParser(0))(new CharSequenceReader(input))
 
-    println("Debug: read in: " + p)
-
     p match {
       case s: Success[List[Any]] => s.result
       case f: Failure => sys.error(f.toString)
@@ -22,14 +20,16 @@ object Reader extends Parsers {
     rep(eol) ~>
       repN(depth, '\t') ~>
       rep1sep(atomParser, rep1(' ')) ~
-      rep(eol ~> atomListParser(depth + 1)) ^^ (x => {
-        val t = (x._1 ++ x._2)
+      rep(rep(' ') ~> eol ~> atomListParser(depth + 1)) ^^ (x => stitch(x._1, x._2))
 
-        if (t.length == 1)
-          t.head
-        else
-          t
-      })
+  private def stitch(a: List[Any], b: List[Any]) = {
+    val t = (a ++ b)
+
+    if (t.length == 1)
+      t.head
+    else
+      t
+  }
 
   private def atomParser = intParser | quotedStringParser | symbolParser
 
@@ -41,7 +41,8 @@ object Reader extends Parsers {
   private def symbolParser = rep1(acceptIf(c => !c.isWhitespace && !c.isControl)(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ charListToSymbol
 
   // TODO: add string escaping
-  private def quotedStringParser = '"' ~> rep(acceptIf(c => c != '"' && c != '\n')(c => "Unexpected '" + c + "' when parsing inside quote")) <~ '"' ^^ charListToString
+  private def quotedStringParser = '"' ~> rep(insideQuoteParser) ~< '"' ^^ charListToString
+  private def insideQuoteParser = acceptIf(c => c != '"' && c != '\n')(c => "Unexpected '" + c + "' when parsing inside quote")
 
   private def numberListToNumber(nums: List[Int], base: Int) =
     nums.foldLeft(0) { (acc: Int, value: Int) => acc * base + value }
@@ -50,5 +51,9 @@ object Reader extends Parsers {
   private def charListToSymbol(letters: List[Char]) = Symbol(charListToString(letters))
 
   private def eol = elem('\n') // TODO: support windows, but give warnin'
+
+  // get around annoying precedent rule of <~
+  implicit private def toUnannoying[T](p: Parser[T]): UnannoyingParser[T] = new UnannoyingParser(p)
+  private class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
 
 }
