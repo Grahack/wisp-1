@@ -31,18 +31,30 @@ object Reader extends Parsers {
       t
   }
 
-  private def atomParser = intParser | quotedStringParser | symbolParser
+  private def atomParser = listParser | intParser | quotedStringParser | symbolParser
 
+  private def listParser: Parser[List[Any]] = '(' ~> repsep(atomParser, rep1(' ')) ~< ')'
+
+  // TODO: allow arbitrary base
   private def intParser = rep1(digitParser) ^^ (x => numberListToNumber(x, base = 10))
 
   private def digitParser: Parser[Int] =
     acceptIf(c => c.isDigit)(c => "Unexpected '" + c + "' when looking for a digit") ^^ (q => q.asDigit)
 
-  private def symbolParser = rep1(acceptIf(c => !c.isWhitespace && !c.isControl)(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ charListToSymbol
+  // TODO: allow symbol escaping
+  private def symbolParser = rep1(
+    acceptIf(c =>
+      !c.isWhitespace &&
+        !c.isControl &&
+        c != ')' &&
+        c != '(' &&
+        c != '\\' &&
+        c != '"')(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ charListToSymbol
 
-  // TODO: add string escaping
   private def quotedStringParser = '"' ~> rep(insideQuoteParser) ~< '"' ^^ charListToString
-  private def insideQuoteParser = acceptIf(c => c != '"' && c != '\n')(c => "Unexpected '" + c + "' when parsing inside quote")
+
+  // TODO: allow string escaping
+  private def insideQuoteParser = acceptIf(c => c != '"' && c != '\n' && c != '\\')(c => "Unexpected '" + c + "' when parsing inside quote")
 
   private def numberListToNumber(nums: List[Int], base: Int) =
     nums.foldLeft(0) { (acc: Int, value: Int) => acc * base + value }

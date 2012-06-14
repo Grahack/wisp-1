@@ -48,7 +48,7 @@ object Main {
             val nextE = Symbol(":e" + counter)
             env = r._2 + ((nextV, r._1)) + ((nextE, r._2))
 
-            println(nextV.toString + " = " + r._1)
+            println(nextV.toString.drop(1) + " = " + r._1)
           }
         }
 
