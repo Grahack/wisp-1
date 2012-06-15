@@ -5,9 +5,9 @@ import scala.util.parsing.combinator.Parsers
 object Main {
 
   def main(args: Array[String]) {
-    println("Welcome to Wisp! Enter a blank line to evaluate. ")
+    println("Welcome to Wisp!")
 
-    var env = Environment()
+    var env = scala.collection.immutable.HashMap[Any, Any]()
     var counter = 0
 
     while (true) {
@@ -40,7 +40,7 @@ object Main {
 
         p.foreach { cell =>
           {
-            val r = Interpretter.resolve(cell, env)
+            val r = Interpretter.resolveWithEnv(cell, env)
 
             counter = counter + 1
 
@@ -48,7 +48,7 @@ object Main {
             val nextE = Symbol(":e" + counter)
             env = r._2 + ((nextV, r._1)) + ((nextE, r._2))
 
-            println(nextV.toString.drop(1) + " = " + r._1)
+            println(nextV.name + " = " + Interpretter.summary(r._1))
           }
         }
 

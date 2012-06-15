@@ -11,7 +11,7 @@ object Reader extends Parsers {
     val p = rep(atomListParser(0))(new CharSequenceReader(input))
 
     p match {
-      case s: Success[List[Any]] => s.result
+      case s: Success[List[Any]] => expand(s.result).asInstanceOf[List[Any]]
       case f: Failure => sys.error(f.toString)
     }
   }
@@ -67,5 +67,20 @@ object Reader extends Parsers {
   // get around annoying precedent rule of <~
   implicit private def toUnannoying[T](p: Parser[T]): UnannoyingParser[T] = new UnannoyingParser(p)
   private class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
+
+ 
+  
+  val builtIns: Map[Symbol, Any] = Interpretter.builtinFunctions.map( x => (x.name, x) ).toMap +
+   (Symbol("#true") -> true) +
+   (Symbol("#false") -> false) +
+   (Symbol("#author") -> "Eric Springer")
+
+  private def expand(v: Any): Any = v match {
+    case l: List[_] => l.map(expand(_))
+    case s: Symbol => builtIns.getOrElse(s, s)
+    case z: String => z
+    case i: Int => i
+    case _ => sys.error("Unknown type of: " + v)
+  }
 
 }
