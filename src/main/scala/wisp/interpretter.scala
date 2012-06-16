@@ -134,7 +134,7 @@ object Interpretter {
       def name = Symbol("#parse")
       def apply(args: List[Any], env: Environment): (Any, Environment) = args match {
         case str :: Nil => {
-          val source = Reader.parse(resolve(str, env).asInstanceOf[String])
+          val source = Reader(resolve(str, env).asInstanceOf[String])
           (source, env)
         }
         case _ => sys.error("#parse expected 1 argument (string to parse), got: " + args)

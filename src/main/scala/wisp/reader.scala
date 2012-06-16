@@ -7,7 +7,7 @@ object Reader extends Parsers {
 
   type Elem = Char
 
-  def parse(input: String) = {
+  def apply(input: String) = {
     val p = rep(atomListParser(0))(new CharSequenceReader(input))
 
     p match {
