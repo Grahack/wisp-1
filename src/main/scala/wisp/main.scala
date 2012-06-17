@@ -7,14 +7,14 @@ import jline.console.completer.Completer
 object Main {
 
   var continue = true;
-  var env = new HashMap[Any, Any]() + (Symbol(":exit") -> exit)
+
+  var env = new HashMap[Any, Any]() + (exit.name -> exit)
 
   def main(args: Array[String]) {
     val console = new ConsoleReader
+    console.addCompleter(WispCompleter)
 
     var counter = 0
-
-    console.addCompleter(WispCompleter)
 
     while (continue) {
       val line = console.readLine("~> ")
@@ -47,9 +47,7 @@ object Main {
             console.print(" " * spaces)
           else
             console.println()
-          console.print(info)
-          console.println()
-          //console.flush()
+          console.println(info)
 
         } catch {
           case x => console.println("Caught error: " + x)
@@ -58,10 +56,10 @@ object Main {
     }
   }
 
-  val exit = new BuiltinFunction {
+  def exit = new BuiltinFunction {
     def name = Symbol(":exit")
     def apply(args: List[Any], env: HashMap[Any, Any]) = {
-      continue = false;
+      continue = false
       (1, env)
     }
   }
@@ -82,12 +80,22 @@ object Main {
 
       val (before, start) = split(buffer, at)
 
+      // TODO: once a core.wisp is made, this block should be removed
+      if (before.startsWith("#")) {
+        Interpretter.builtinFunctions.map(f => {
+          val n = f.name.name
+          if (n.startsWith(before)) {
+            results.add(n + " ")
+          }
+        })
+      }
+
       env.map(e => {
         if (e._1.isInstanceOf[Symbol]) {
           val s = e._1.asInstanceOf[Symbol].name
 
           if (s.startsWith(before)) {
-            results.add(s)
+            results.add(s + " ") // TODO: might not want to add space if there's an unterminated paren?
           }
         }
       })
@@ -96,7 +104,12 @@ object Main {
     }
 
     def split(buffer: String, at: Int): (String, Int) = {
-      val lio = buffer.lastIndexOf(' ', math.max(at - 1, 0))
+      val from = math.max(at - 1, 0)
+      
+      // TODO: probably a nicer way to write this then nested maxes
+      val lio = math.max(buffer.lastIndexOf(' ', from),
+          math.max(buffer.lastIndexOf('(', from),
+              buffer.lastIndexOf(')', from)))
       val start = if (lio < at) lio + 1 else at
       val before = buffer.substring(math.min(start, buffer.length), at)
 

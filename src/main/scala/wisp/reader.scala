@@ -33,7 +33,7 @@ object Reader extends Parsers {
 
   private def atomParser = listParser | intParser | quotedStringParser | symbolParser
 
-  private def listParser: Parser[List[Any]] = '(' ~> repsep(atomParser, rep1(' ')) ~< ')'
+  private def listParser: Parser[List[Any]] = '(' ~> rep(' ') ~> repsep(atomParser, rep(' ')) ~< rep(' ') ~< ')'
 
   // TODO: allow arbitrary base
   private def intParser = rep1(digitParser) ^^ (x => numberListToNumber(x, base = 10))
