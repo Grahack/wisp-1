@@ -2,16 +2,19 @@ package wisp
 
 import scala.collection.immutable.HashMap
 import jline.console.ConsoleReader
+import jline.console.completer.Completer
 
 object Main {
 
   var continue = true;
+  var env = new HashMap[Any, Any]() + (Symbol(":exit") -> exit)
 
   def main(args: Array[String]) {
     val console = new ConsoleReader
 
     var counter = 0
-    var env = new HashMap[Any, Any]() + (Symbol(":exit") -> exit)
+
+    console.addCompleter(WispCompleter)
 
     while (continue) {
       val line = console.readLine("~> ")
@@ -46,7 +49,7 @@ object Main {
             console.println()
           console.print(info)
           console.println()
-          console.flush()
+          //console.flush()
 
         } catch {
           case x => console.println("Caught error: " + x)
@@ -71,6 +74,35 @@ object Main {
     val s = System.nanoTime
     val ret = f
     (ret, (System.nanoTime - s) / 1e6)
+  }
+
+  object WispCompleter extends Completer {
+
+    def complete(buffer: String, at: Int, results: java.util.List[CharSequence]) = {
+
+      val (before, start) = split(buffer, at)
+
+      env.map(e => {
+        if (e._1.isInstanceOf[Symbol]) {
+          val s = e._1.asInstanceOf[Symbol].name
+
+          if (s.startsWith(before)) {
+            results.add(s)
+          }
+        }
+      })
+
+      start
+    }
+
+    def split(buffer: String, at: Int): (String, Int) = {
+      val lio = buffer.lastIndexOf(' ', math.max(at - 1, 0))
+      val start = if (lio < at) lio + 1 else at
+      val before = buffer.substring(math.min(start, buffer.length), at)
+
+      (before, start)
+    }
+
   }
 
 }
