@@ -70,14 +70,11 @@ object Reader extends Parsers {
 
  
   
-  val builtIns: Map[Symbol, Any] = Interpretter.builtinFunctions.map( x => (x.name, x) ).toMap +
-   (Symbol("#true") -> true) +
-   (Symbol("#false") -> false) +
-   (Symbol("#author") -> "Eric Springer")
+
 
   private def expand(v: Any): Any = v match {
     case l: List[_] => l.map(expand(_))
-    case s: Symbol => builtIns.getOrElse(s, s)
+    case s: Symbol => Builtin.values.getOrElse(s, s)
     case z: String => z
     case i: Int => i
     case _ => sys.error("Unknown type of: " + v)

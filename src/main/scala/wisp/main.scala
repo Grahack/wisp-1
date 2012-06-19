@@ -8,9 +8,19 @@ object Main {
 
   var continue = true;
 
-  var env = new HashMap[Any, Any]() + (exit.name -> exit)
+  var env = new Environment() 
 
   def main(args: Array[String]) {
+    
+    import Interpretter._
+    
+    args.map {
+      (file) =>
+        env = evalBlock(Reader(Interpretter.read(file)), env)._2
+    }
+    
+    env = env + (exit.name -> exit)
+    
     val console = new ConsoleReader
     console.addCompleter(WispCompleter)
 
@@ -29,7 +39,7 @@ object Main {
           require(exprs.length == 1)
           val ast = exprs.head
 
-          val (r, t) = time(Interpretter.resolveWithEnv(ast, env))
+          val (r, t) = time(eval(ast, env))
 
           counter = counter + 1
 
@@ -48,6 +58,7 @@ object Main {
           else
             console.println()
           console.println(info)
+          console.flush()
 
         } catch {
           case x => console.println("Caught error: " + x)
@@ -80,10 +91,10 @@ object Main {
 
       val (before, start) = split(buffer, at)
 
-      // TODO: once a core.wisp is made, this block should be removed
+      // TODO: this is hacky, and eventually should be removed
       if (before.startsWith("#")) {
-        Interpretter.builtinFunctions.map(f => {
-          val n = f.name.name
+        Builtin.values.map(f => {
+          val n = f._1.name
           if (n.startsWith(before)) {
             results.add(n + " ")
           }
