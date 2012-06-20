@@ -1,24 +1,24 @@
 package wisp
 
-import Interpretter._
-
 object Interpretter {
 
-  import scala.annotation.tailrec
+  def eval(env: Environment, in: Any): Any =
+    in match {
+      case l: List[_] =>
+        eval(env, l.head).asInstanceOf[Function](env, l.tail)
+      case s: Symbol => eval(env, env(s))
+      case x => x
+    }
 
-  def eval(in: Any, env: Environment): (Any, Environment) = in match {
-    case l: List[_] => eval(eval(l.head, env)._1, env)._1.asInstanceOf[BuiltinFunction](l.tail, env) // TODO: thread the env? 
-    case x => (resolve(x, env), env)
-  }
+  def resolve(env: Environment, in: Any): Any =
+    in match {
+      case s: Symbol => env(s)
+      case x => x
+    }
 
-  def resolve(in: Any, env: Environment): Any = in match {
-    case s: Symbol => env(s)
-    case x => x
-  }
-
-  def evalBlock(in: List[Any], env: Environment): (Any, Environment) = {
-    in.foldLeft((List(): Any, env)) {
-      (pre, value) => eval(value, pre._2)
+  def foldEval(start: Environment, in: List[Any]): Environment = {
+    in.foldLeft(start) {
+      (env, value) => eval(env, value).asInstanceOf[Environment]
     }
   }
 
@@ -28,7 +28,7 @@ object Interpretter {
       case s: Symbol => s.name
       case i: Int => i.toString
       case m: Map[_, _] => "(#map " + m.toList.map(x => "(" + format(x._1) + " " + format(x._2) + ")").mkString(" ") + ")"
-      case b: BuiltinFunction => b.name.name
+      case b: Function => b.name.name
       case s: String => '"' + s + '"'
       case b: Boolean => if (b) "#true" else "#false"
       case _ => sys.error("Unknown type of: " + a)

@@ -1,30 +1,21 @@
 package wisp
 
-import scala.collection.immutable.HashMap
 import jline.console.ConsoleReader
 import jline.console.completer.Completer
+import Interpretter._
 
 object Main {
 
   var continue = true;
 
-  var env = new Environment() 
+  var env: Environment = null
 
   def main(args: Array[String]) {
-    
-    import Interpretter._
-    
-    args.map {
-      (file) =>
-        env = evalBlock(Reader(Interpretter.read(file)), env)._2
-    }
-    
-    env = env + (exit.name -> exit)
-    
+
     val console = new ConsoleReader
     console.addCompleter(WispCompleter)
 
-    var counter = 0
+    reload(null, null) // sets the env
 
     while (continue) {
       val line = console.readLine("~> ")
@@ -39,15 +30,9 @@ object Main {
           require(exprs.length == 1)
           val ast = exprs.head
 
-          val (r, t) = time(eval(ast, env))
+          val (r, t) = time(eval(env, ast))
 
-          counter = counter + 1
-
-          val nextV = Symbol(":ret" + counter)
-          val nextE = Symbol(":env" + counter)
-          env = r._2 + (nextV -> r._1) + (nextE -> r._2)
-
-          val summary = nextV.name + " = " + Interpretter.summary(r._1)
+          val summary = Interpretter.summary(r)
           val info = "[Took " + t + "ms]"
 
           val spaces = console.getTerminal.getWidth - summary.length - info.length
@@ -59,19 +44,31 @@ object Main {
             console.println()
           console.println(info)
           console.flush()
-
-        } catch {
-          case x => console.println("Caught error: " + x)
-        }
+        }/* catch {
+          case e => println("Caught exception: " + e)
+        }*/
       }
+    }
+
+    def reload: Function = new Function {
+      def apply(ignore: Environment, ignore2: List[Any]): Environment = {
+        val q =
+          args.foldLeft(new Environment()) {
+            (e: Environment, file: String) => foldEval(e, Reader(Interpretter.read(file)))
+          } + (exit.name -> exit) + (name -> reload)
+
+        env = q.asInstanceOf[Environment]
+        env
+      }
+      def name = Symbol(":reload")
     }
   }
 
-  def exit = new BuiltinFunction {
+  def exit = new Function {
     def name = Symbol(":exit")
-    def apply(args: List[Any], env: HashMap[Any, Any]) = {
+    def apply(env: Environment, args: List[Any]) = {
       continue = false
-      (1, env)
+      List()
     }
   }
 
@@ -116,11 +113,11 @@ object Main {
 
     def split(buffer: String, at: Int): (String, Int) = {
       val from = math.max(at - 1, 0)
-      
+
       // TODO: probably a nicer way to write this then nested maxes
       val lio = math.max(buffer.lastIndexOf(' ', from),
-          math.max(buffer.lastIndexOf('(', from),
-              buffer.lastIndexOf(')', from)))
+        math.max(buffer.lastIndexOf('(', from),
+          buffer.lastIndexOf(')', from)))
       val start = if (lio < at) lio + 1 else at
       val before = buffer.substring(math.min(start, buffer.length), at)
 
