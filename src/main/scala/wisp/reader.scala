@@ -8,12 +8,11 @@ object Reader extends Parsers {
   type Elem = Char
 
   def apply(input: String) = {
-    val p = (rep(atomListParser(0)) <~ rep(eol)) (new CharSequenceReader(input))
+    val p = rep(atomListParser(0))(new CharSequenceReader(input))
 
     p match {
-      case Success(res, next) if next.atEnd =>  expand(res).asInstanceOf[List[Any]]
+      case s: Success[List[Any]] => expand(s.result).asInstanceOf[List[Any]]
       case f: Failure => sys.error(f.toString)
-      case x => sys.error("Couldn't FULLY parse, result: " + x)
     }
   }
 
