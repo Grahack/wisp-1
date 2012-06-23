@@ -6,19 +6,22 @@ object Interpretter {
 
   import scala.annotation.tailrec
 
-  def eval(in: Any, env: Environment): (Any, Environment) = in match {
-    case l: List[_] => eval(eval(l.head, env)._1, env)._1.asInstanceOf[BuiltinFunction](l.tail, env) // TODO: thread the env? 
-    case x => (resolve(x, env), env)
+  def eval(env: Environment, in: Any): (Environment, Any) = in match {
+    case l: List[_] => eval(env, l.head)._2.asInstanceOf[BuiltinFunction](env, l.tail) // TODO: thread the env?
+    case s: Symbol => eval(env, env(s))
+    case x => (env, x)
   }
+  
+  def seval(env: Environment, in: Any) = eval(env, in)._2
 
-  def resolve(in: Any, env: Environment): Any = in match {
+  def resolve(env: Environment, in: Any): Any = in match {
     case s: Symbol => env(s)
     case x => x
   }
 
-  def evalBlock(in: List[Any], env: Environment): (Any, Environment) = {
-    in.foldLeft((List(): Any, env)) {
-      (pre, value) => eval(value, pre._2)
+  def evalBlock(env: Environment, in: List[Any]): (Environment, Any) = {
+    in.foldLeft(env, List(): Any) {
+      (pre, value) => eval(pre._1, value)
     }
   }
 

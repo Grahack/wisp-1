@@ -1,6 +1,5 @@
 package wisp
 
-import scala.collection.immutable.HashMap
 import jline.console.ConsoleReader
 import jline.console.completer.Completer
 
@@ -8,19 +7,19 @@ object Main {
 
   var continue = true;
 
-  var env = new Environment() 
+  var env = new Environment()
 
   def main(args: Array[String]) {
-    
+
     import Interpretter._
-    
+
     args.map {
       (file) =>
-        env = evalBlock(Reader(Interpretter.read(file)), env)._2
+        env = evalBlock(env, Reader(Interpretter.read(file)))._1
     }
-    
+
     env = env + (exit.name -> exit)
-    
+
     val console = new ConsoleReader
     console.addCompleter(WispCompleter)
 
@@ -32,22 +31,22 @@ object Main {
       if (line == null)
         return ;
 
-      if (!isBlank(line)) {
+      if (!line.matches("^\\s*$")) { // if line contains non-whitespace
 
         try {
           val exprs = Reader(line)
           require(exprs.length == 1)
           val ast = exprs.head
 
-          val (r, t) = time(eval(ast, env))
+          val (r, t) = time(eval(env, ast))
 
           counter = counter + 1
 
           val nextV = Symbol(":ret" + counter)
           val nextE = Symbol(":env" + counter)
-          env = r._2 + (nextV -> r._1) + (nextE -> r._2)
+          env = r._1 + (nextE -> r._1) + (nextV -> r._2)
 
-          val summary = nextV.name + " = " + Interpretter.summary(r._1)
+          val summary = nextV.name + " = " + Interpretter.summary(r._2)
           val info = "[Took " + t + "ms]"
 
           val spaces = console.getTerminal.getWidth - summary.length - info.length
@@ -69,14 +68,10 @@ object Main {
 
   def exit = new BuiltinFunction {
     def name = Symbol(":exit")
-    def apply(args: List[Any], env: HashMap[Any, Any]) = {
+    def apply(env: Environment, args: List[Any]) = {
       continue = false
-      (1, env)
+      (env, 1)
     }
-  }
-
-  def isBlank(line: String): Boolean = {
-    return line.isEmpty // TODO: 'or all whitespace'..
   }
 
   def time[A](f: => A) = {
@@ -92,7 +87,7 @@ object Main {
       val (before, start) = split(buffer, at)
 
       // TODO: this is hacky, and eventually should be removed
-      if (before.startsWith("#")) {
+      if (before.isEmpty || before.startsWith("#")) {
         Builtin.values.map(f => {
           val n = f._1.name
           if (n.startsWith(before)) {
@@ -116,11 +111,11 @@ object Main {
 
     def split(buffer: String, at: Int): (String, Int) = {
       val from = math.max(at - 1, 0)
-      
+
       // TODO: probably a nicer way to write this then nested maxes
       val lio = math.max(buffer.lastIndexOf(' ', from),
-          math.max(buffer.lastIndexOf('(', from),
-              buffer.lastIndexOf(')', from)))
+        math.max(buffer.lastIndexOf('(', from),
+          buffer.lastIndexOf(')', from)))
       val start = if (lio < at) lio + 1 else at
       val before = buffer.substring(math.min(start, buffer.length), at)
 

@@ -1,5 +1,4 @@
 package object wisp {
-  
-  type Environment = scala.collection.immutable.HashMap[Any, Any]
-
+  type HashMap = scala.collection.immutable.HashMap[Any, Any]
+  type Environment = HashMap
 }
