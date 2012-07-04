@@ -8,10 +8,10 @@ object Reader extends Parsers {
   type Elem = Char
 
   def apply(input: String) = {
-    val p = (rep(atomListParser(0)) <~ rep(eol)) (new CharSequenceReader(input))
+    val p = ((atomListParser(0)) <~ rep(eol)) (new CharSequenceReader(input))
 
     p match {
-      case Success(res, next) if next.atEnd => expand(res).asInstanceOf[List[Any]]
+      case Success(res, next) if next.atEnd => expand(res)
       case f: Failure => sys.error(f.toString)
       case x => sys.error("Couldn't FULLY parse, result: " + x)
     }
@@ -75,7 +75,7 @@ object Reader extends Parsers {
 
   private def expand(v: Any): Any = v match {
     case l: List[_] => l.map(expand(_))
-    case s: Symbol => Builtin.values.getOrElse(s, s)
+    case s: Symbol => Interpretter.builtinValues.getOrElse(s, s)
     case z: String => z
     case i: Int => i
     case _ => sys.error("Unknown type of: " + v)
