@@ -6,28 +6,49 @@ import Interpretter._
 
 object Main {
 
-  var continue = true;
-
   def main(args: Array[String]) {
 
     val console = new ConsoleReader
     console.addCompleter(WispCompleter)
 
-    args.foreach {
-      (file: String) =>
-        {
+    var expandVals = Interpretter.builtinValues
 
-          console.println("File " + file + ":")
+    def run(input: Any, newSymb: Symbol) = {
+      try {
+        val (r, t) = time(eval[Any](input))
 
-          val parsed = Reader(read(file))
-          console.println("~~parsed: " + summary(parsed))
-          console.flush()
-          val evld = eval[Any](parsed)
-          console.println("~~evaled: " + summary(eval(parsed)))
+        expandVals = expandVals + (newSymb -> r)
 
-        }
+        val summary = newSymb.name + " = " + Interpretter.summary(r)
+        val info = "[Took " + t + "ms]"
+
+        val spaces = console.getTerminal.getWidth - summary.length - info.length
+
+        console.print(summary)
+        if (spaces > 0)
+          console.print(" " * spaces)
+        else
+          console.println()
+        console.println(info)
+        console.flush()
+
+      } /*catch {
+          case x => console.println("Caught error: " + x)
+        }*/
+
     }
 
+    args.foreach {
+      (file: String) => {
+        val fileSummaryStart = math.max(0, file.lastIndexOf('/')+1)
+        val fileSummaryEnd = math.min(file.size-1, file.lastIndexOf('.'))
+        
+        run(Reader(expandVals, read(file)), Symbol(":" + file.substring(fileSummaryStart, fileSummaryEnd)))        
+      }
+    }
+
+    var count = 0
+    var continue = true;
     while (continue) {
       val line = console.readLine("~> ")
 
@@ -35,28 +56,9 @@ object Main {
         return ;
 
       if (!line.matches("^\\s*$")) { // if line contains non-whitespace
-
-        try {
-          val expr = Reader(line)
-
-          val (r, t) = time(eval[Any](expr))
-
-          val summary = "==> " + Interpretter.summary(r)
-          val info = "[Took " + t + "ms]"
-
-          val spaces = console.getTerminal.getWidth - summary.length - info.length
-
-          console.print(summary)
-          if (spaces > 0)
-            console.print(" " * spaces)
-          else
-            console.println()
-          console.println(info)
-          console.flush()
-
-        } catch {
-          case x => console.println("Caught error: " + x)
-        }
+        count = count + 1
+        
+        run(Reader(expandVals, line), Symbol(":res" + count))
       }
     }
   }
@@ -82,16 +84,6 @@ object Main {
           }
         })
       }
-
-      //      env.map(e => {
-      //        if (e._1.isInstanceOf[Symbol]) {
-      //          val s = e._1.asInstanceOf[Symbol].name
-      //
-      //          if (s.startsWith(before)) {
-      //            results.add(s + " ") // TODO: might not want to add space if there's an unterminated paren?
-      //          }
-      //        }
-      //      })
 
       start
     }

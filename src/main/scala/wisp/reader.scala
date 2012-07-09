@@ -7,11 +7,11 @@ object Reader extends Parsers {
 
   type Elem = Char
 
-  def apply(input: String) = {
-    val p = ((atomListParser(0)) <~ rep(eol)) (new CharSequenceReader(input))
+  def apply(ex: Map[Symbol, Any], input: String) = {
+    val p = ((atomListParser(0)) <~ rep(eol))(new CharSequenceReader(input))
 
     p match {
-      case Success(res, next) if next.atEnd => expand(res)
+      case Success(res, next) if next.atEnd => expand(ex, res)
       case f: Failure => sys.error(f.toString)
       case x => sys.error("Couldn't FULLY parse, result: " + x)
     }
@@ -69,13 +69,9 @@ object Reader extends Parsers {
   implicit private def toUnannoying[T](p: Parser[T]): UnannoyingParser[T] = new UnannoyingParser(p)
   private class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
 
- 
-  
-
-
-  private def expand(v: Any): Any = v match {
-    case l: List[_] => l.map(expand(_))
-    case s: Symbol => Interpretter.builtinValues.getOrElse(s, s)
+  private def expand(ex: Map[Symbol, Any], v: Any): Any = v match {
+    case l: List[_] => l.map(expand(ex, _))
+    case s: Symbol => ex.getOrElse(s, s)
     case z: String => z
     case i: Int => i
     case _ => sys.error("Unknown type of: " + v)

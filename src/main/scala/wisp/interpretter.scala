@@ -25,7 +25,7 @@ object Interpretter {
       case l: IsWList => l.map(format(_)).mkString("(", " ", ")")
       case s: Symbol => s.name
       case i: Int => i.toString
-      case m: IsWMap => "(#map-new " + m.toList.map(x => "(" + format(x._1) + " " + format(x._2) + ")").mkString(" ") + ")"
+      case m: IsWMap => "{: " + m.toList.map(x => "(" + format(x._1) + " " + format(x._2) + ")").mkString(" ") + ":}"
       case b: WFunc => b.name.name
       case s: String => '"' + s + '"'
       case b: Boolean => if (b) "#true" else "#false"
@@ -48,8 +48,9 @@ object Interpretter {
   trait SimpleFunc extends WFunc {
     def apply(args: WList) = args match {
       case e :: rest => {
-        val env = e.asInstanceOf[WEnv]
-        run(rest.map(x => eval(env, x)))
+        val env = eval[WEnv](e)
+        val eargs = rest.map(x => eval[Any](env, x))
+        run(eargs)
       }
       case _ => err
     }
@@ -66,29 +67,24 @@ object Interpretter {
     // crazy primitives
     new WFunc {
       def name = Symbol("#$eval")
-      def apply(args: WList) = {
-        require(!args.isEmpty)
-
-        // this is a little tricky, as it can be anything -- unless something is after it,
-        // in which case it must be a WEnv
-        val fst = eval[Any](args.head) 
-
-        args.tail.foldLeft(fst)((e, n) => eval[Any](e.asInstanceOf[WEnv], n))
+      def apply(args: WList) = args match {
+        case e :: v :: Nil => eval[Any](eval[WEnv](e), v)
+        case v => eval[Any](v)
       }
     },
 
     new WFunc {
       def name = Symbol("#$lambda")
       def apply(args: WList) = args match {
-        case (env: WEnv) :: (symbol: Symbol) :: body :: Nil => UserDefinedFunc(env, symbol, body)
+        case env :: (symbol: Symbol) :: body :: Nil => UserDefinedFunc(eval[WEnv](env), symbol, body)
         case _ => err
       }
     },
 
     new WFunc {
-      def name = Symbol("#$let")
+      def name = Symbol("#$map-add")
       def apply(args: WList) = args match {
-        case (env: WEnv) :: key :: v :: Nil => env + (key -> v)
+        case env :: key :: v :: Nil => eval[WEnv](env) + (key -> v)
         case _ => err
       }
     },
@@ -97,7 +93,7 @@ object Interpretter {
       def name = Symbol("#$thread-first")
       def apply(args: WList) = args match {
         case single :: Nil => single
-        case x :: (into: IsWList) :: rest => apply((into.head :: x :: into.tail.tail) :: rest)
+        case x :: (into: IsWList) :: rest => apply((into.head :: x :: into.tail) :: rest)
         case _ => err
       }
     },
@@ -107,7 +103,7 @@ object Interpretter {
     new WFunc {
       def name = Symbol("#$print")
       def apply(args: WList) = {
-        println("~~~~DEBUG: " + format(args))
+        args.foreach(x => println(format(x)))
         List()
       }
     },
@@ -117,7 +113,7 @@ object Interpretter {
     new WFunc {
       def name = Symbol("#print")
       def apply(args: WList) = {
-        println(format(args))
+        args.foreach(x => println(format(x)))
         List()
       }
     },
@@ -130,7 +126,8 @@ object Interpretter {
       def name = Symbol("#list-new")
       def run(args: WList) = args
     }).map(x => (x.name, x)).toMap +
-    (Symbol("#true") -> true) +
-    (Symbol("#empty-map") -> new WMap())
+    (Symbol("#bool-true") -> true) +
+    (Symbol("#bool-false") -> false) +
+    (Symbol("#map-empty") -> new WMap())
 
 }
