@@ -7,11 +7,11 @@ object Reader extends Parsers {
 
   type Elem = Char
 
-  def apply(ex: Map[Symbol, Any], input: String) = {
-    val p = ((atomListParser(0)) <~ rep(eol))(new CharSequenceReader(input))
+  def apply(input: String) = {    
+    val p = rep((atomListParser(0)) <~ rep(eol))(new CharSequenceReader(input))
 
     p match {
-      case Success(res, next) if next.atEnd => expand(ex, res)
+      case Success(res, next) if next.atEnd => res
       case f: Failure => sys.error(f.toString)
       case x => sys.error("Couldn't FULLY parse, result: " + x)
     }
