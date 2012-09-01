@@ -2,87 +2,203 @@ package wisp
 
 object Interpretter {
 
-  type Env = Map[Symbol, Any]
+  def apply(forms: List[Any]): Any = DoBlock(startingEnv, forms)
 
-  def preprocess(startingEnv: Env, v: List[Any]) = {
+  private def startingEnv: Env = new Env() +
+    ('true -> true) +
+    ('false -> false) +
+    // Some pretty primitive stuff
+    ('do -> DoBlock) +
+    ('eval -> Eval) +
+    ('if -> If) +
+    ('lambda -> Lambda) +
+    // some maths stuff
+    (Symbol("+") -> Add) +
+    (Symbol("-") -> Sub) +
+    (Symbol("<") -> LessThan) +
+    (Symbol("<=") -> LessThanOrEqual) +
+    (Symbol("==") -> Equal) +
+    (Symbol(">") -> GreaterThan) +
+    (Symbol(">=") -> GreaterThanOrEqual) +
+    // utility like
+    ('str -> Str) +
+    ('nth -> Nth) +
+    ('assert -> Assert) +
+    // debug
+    ('trace -> Trace)
 
-    val lets = v.flatMap {
-      _ match {
-        case Let(s, v) => Some(s -> Let(v))
-        case _ => None
-      }
-    }
-
-    // Now, let's add them all to a new environment
-
-    val newEnv = lets.foldLeft(startingEnv) {
-      (oldEnv, form) =>
-        require(!oldEnv.contains(form._1), "Can't redefine a symbol: " + form._1)
-        oldEnv + form
-    }
-
-    // Now, we're going to be really dirty -- and mutate the recently discovered lets, with the newEnvironment
-    // (Note how this is a cyclic graph, and I don't feel like using functional hacks
-    lets.map(_._2).filter(_.isInstanceOf[LazyStore]).foreach { _.asInstanceOf[LazyStore].setEnv(newEnv) }
-
-    // now that we have an environment, lets go through..
-
-    val forms: List[WVal] = v.map(processForm(newEnv, _))
-    
-    new Function0[Any] {
-      def apply(): Any = forms.foldLeft(List(): Any)((a, b) => b.get())
-    }
+  trait WVal {
+    def apply(e: Env): Any
   }
 
-  def processForm(e: Env, v: Any): WVal = {
-    v match {
+  trait WFunc {
+    def apply(e: Env, args: List[Any]): Any
+  }
+
+  def eval(e: Env, form: Any): Any = {
+    assert(!e.contains('let))
+    form match {
       case s: Symbol => {
-        require(e.contains(s), "Unknown symbol " + s)
-        processForm(e, e(s))
+        e(s) match {
+          case v: WVal => v.apply(e)
+          case x => x
+        }
       }
-      case Let(_, _) => WNone
-      case Add(values) => Add(values.map(v => WInt(processForm(e, v))))
-      case l: List[_] => sys.error("Unknown function call" + l)
-      case x => WAny(x)
-    }
-  }
-
-  object Add {
-    def unapply(v: Any) = v match {
-      case 'add :: args => Some(args)
-      case _ => None
-    }
-    def apply(values: List[WInt]) = WIntFunc(() => values.map(_.get).reduce(_ + _))
-  }
-
-  object Let {
-    def apply(form: Any) = form match {
-      case l: List[_] => new LazyStore(form, false)
+      case head :: args => {
+        val h = eval(e, head)
+        require(h.isInstanceOf[WFunc])
+        h.asInstanceOf[WFunc](e, args)
+      }
       case x => x
     }
-    def unapply(v: Any) = v match {
-      case 'let :: (s: Symbol) :: v :: Nil => Some(s, v)
-      case _ => None
+  }
+
+  object Eval extends WFunc {
+    def apply(e: Env, args: List[Any]) = eval(e, args)
+  }
+
+  object Add extends WFunc {
+    def apply(e: Env, args: List[Any]) = { args.foldLeft(0)((acc, b) => acc + eval(e, b).asInstanceOf[Int]) }
+  }
+
+  object Sub extends WFunc {
+    def apply(e: Env, args: List[Any]) =
+      args.size match {
+        case 0 => 0
+        case 1 => -eval(e, args.head).asInstanceOf[Int]
+        case _ => args.tail.foldLeft((eval(e, args.head).asInstanceOf[Int]))((acc, b) => acc - eval(e, b).asInstanceOf[Int])
+      }
+  }
+
+  object If extends WFunc {
+    def apply(e: Env, args: List[Any]) = {
+      require(args.size == 3)
+      if (eval(e, args(0)).asInstanceOf[Boolean]) eval(e, args(1)) else eval(e, args(2))
     }
   }
 
-  class LazyStore(var payload: Any, var hasBeenEval: Boolean) extends WVal {
+  object Lambda extends WFunc {
+    def apply(e: Env, args: List[Any]) = {
 
-    def get(): Any = {
+      args match {
+        case (argsS: Symbol) :: code :: Nil => {
+          require(!e.contains(argsS))
+          new WFunc {
+            def apply(de: Env, args: List[Any]) = {
+              val newEnv = e + (argsS -> args.map(eval(de, _)))
 
-      if (!hasBeenEval) {
-        hasBeenEval = true
-        assert(payload.isInstanceOf[WVal])
-        payload = payload.asInstanceOf[WVal].get()
+              eval(newEnv, code)
+            }
+          }
+        }
+        case a => sys.error("Unknown args for a lambda expression: " + a)
       }
-      payload
+    }
+  }
+
+  def foldReduce(op: (Int, Int) => Boolean, e: Env, args: List[Any]): Boolean = {
+    require(args.size > 1)
+    var acc = eval(e, args.head).asInstanceOf[Int]
+
+    args.tail.foreach { a =>
+      val r = eval(e, a).asInstanceOf[Int]
+      if (op(acc, r))
+        acc = r
+      else
+        return false
     }
 
-    def setEnv(e: Env) {
-      assert(!hasBeenEval)
-      payload = processForm(e, payload)
-    }
+    true
+  }
 
+  object LessThan extends WFunc {
+    def apply(e: Env, args: List[Any]): Boolean = foldReduce(_ < _, e, args)
+  }
+
+  object LessThanOrEqual extends WFunc {
+    def apply(e: Env, args: List[Any]): Boolean = foldReduce(_ <= _, e, args)
+  }
+
+  object Equal extends WFunc {
+    def apply(e: Env, args: List[Any]): Boolean = foldReduce(_ == _, e, args)
+  }
+
+  object GreaterThan extends WFunc {
+    def apply(e: Env, args: List[Any]): Boolean = foldReduce(_ > _, e, args)
+  }
+
+  object GreaterThanOrEqual extends WFunc {
+    def apply(e: Env, args: List[Any]): Boolean = foldReduce(_ >= _, e, args)
+  }
+
+  object DoBlock extends WFunc {
+    def apply(e: Env, forms: List[Any]): Any = {
+      val (lets, rest) = forms.partition {
+        _ match {
+          case 'let :: (s: Symbol) :: v :: Nil => true
+          case 'let :: _ => sys.error("Malformed let")
+          case _ => false
+        }
+      }
+
+      object LetResult { def apply(v: Any) = new LetResult(v, false) }
+
+      class LetResult(var value: Any, var hasBeenEval: Boolean) extends WVal {
+        def apply(e: Env): Any = {
+          if (!hasBeenEval) {
+            value = eval(e, value)
+            hasBeenEval = true
+          }
+          value
+        }
+      }
+
+      val allLets = lets.map(x => { val y = x.asInstanceOf[List[Any]]; (y(1).asInstanceOf[Symbol] -> LetResult(y(2))) })
+
+      // Now, let's add them all to a new environment
+
+      val newEnv = allLets.foldLeft(e) {
+        (oldEnv, form) =>
+          require(!oldEnv.contains(form._1), "Can't redefine a symbol: " + form._1)
+          oldEnv + form
+      }
+
+      // now that we done all our static environment stuff, we can go through and evaluate it all
+
+      rest.foldLeft(List(): Any)((a, b) => eval(newEnv, b))
+    }
+  }
+
+  object Str extends WFunc {
+    // TODO: might need to use a string-builder
+    def apply(e: Env, args: List[Any]): Any = args.map(eval(e, _).toString).reduce(_ + _)
+  }
+
+  object Nth extends WFunc {
+    def apply(e: Env, args: List[Any]): Any = {
+      require(args.length == 2)
+
+      val value = eval(e, args(0)).asInstanceOf[List[_]]
+      val index = eval(e, args(1)).asInstanceOf[Int]
+
+      value(index)
+    }
+  }
+
+  object Trace extends WFunc {
+    def apply(e: Env, args: List[Any]): Any = {
+      println(args.map(eval(e, _)).mkString)
+    }
+  }
+
+  object Assert extends WFunc {
+    def apply(e: Env, args: List[Any]): Any = {
+      require(args.size == 1 || args.size == 2)
+      val r = eval(e, args(0)).asInstanceOf[Boolean]
+      if (!r) {
+        sys.error("Code assertion failed!" + (if (args.size == 2) " Message is: " + eval(e, args(1))))
+      }
+    }
   }
 
 }

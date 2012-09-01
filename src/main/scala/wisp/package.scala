@@ -1,9 +1,6 @@
 package object wisp {
-  type WMap = scala.collection.immutable.HashMap[Any, Any]
 
-  val emptyWMap = scala.collection.immutable.HashMap[Any, Any]()
-
-  type IsWMap = scala.collection.immutable.HashMap[_, _]
+  type Env = scala.collection.immutable.HashMap[Symbol, Any]
 
   def load(file: String) = {
     val source = scala.io.Source.fromFile(file)
@@ -11,7 +8,6 @@ package object wisp {
     source.close()
     lines
   }
-  
   
 
 }

@@ -13,12 +13,10 @@ object Main {
 
     println("Took " + parseTime + "ms to parse")
 
-    val (byteCode, byteCodeTime) = timeFunc(Interpretter.preprocess(Map(), parsed))
-    
-    println("Took " + byteCodeTime + " to optimize")
-
-    val (res, time) = timeFunc(byteCode())
+    val (res, time) = timeFunc(Interpretter(parsed))
     println("Took " + time + "ms to run")
+    
+    println("Result: " + res)
   }
 
   def timeFunc[A](f: => A) = {
