@@ -9,10 +9,11 @@ object Reader extends Parsers {
 
   type Elem = Char
 
-  def apply(input: Path) = { 
-    
-    val csr = new CharSequenceReader(new String(Files.readAllBytes(input)))
+  def apply(input: String): List[Any] = Reader(new CharSequenceReader(input))
 
+  def apply(input: Path): List[Any] = Reader(new CharSequenceReader(new String(Files.readAllBytes(input))))
+
+  def apply(csr: scala.util.parsing.input.Reader[Char]): List[Any] = {
     val p = rep((atomListParser(0)) <~ rep(eol))(csr)
 
     p match {

@@ -18,15 +18,8 @@ object Interpretter {
 
       imports.foldLeft(Map[Symbol, Any]())((e, nextImport) => nextImport match {
         case 'import :: (importFilePath: String) :: Nil => {
-
-          val ifp = path.resolveSibling(importFilePath)
-
-          val envLookup = Symbol("__wisp_import:" + ifp.toRealPath().normalize().toString())
-
-          if (e.contains(envLookup))
-            e
-          else
-            e ++ Interpretter(ifp)._2 + (envLookup -> true)
+          // TODO: avoid double-loading a file
+          e ++ Interpretter(path.resolveSibling(importFilePath))._2
         }
         case _ => sys.error("Could not understand import")
       })
@@ -70,7 +63,6 @@ object Interpretter {
   }
 
   def eval(e: Env, form: Any): Any = {
-    assert(!e.contains('let))
     form match {
       case s: Symbol => {
         e(s) match {
@@ -193,9 +185,9 @@ object Interpretter {
       object LetResult { def apply(v: Any) = new LetResult(v, false) }
 
       class LetResult(var payload: Any, var hasBeenEval: Boolean) extends WVal {
-                
+
         def apply(u: Env): Any = {
-                    
+
           if (!hasBeenEval) {
             val (capEnv, original) = payload.asInstanceOf[(Env, Any)]
             payload = eval(capEnv, original)
