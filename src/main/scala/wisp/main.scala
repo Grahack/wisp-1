@@ -13,24 +13,59 @@ object Main {
 
     val path = args.head
 
-    val (res, env) = Interpretter(Paths.get(path))
+    var (res, env) = Interpretter(Paths.get(path))
 
-    console.addCompleter(new WispCompleter(env))
+    // WispCompleter closes over 'env'
+    object WispCompleter extends Completer {
 
-    var line: String = null
+      def complete(buffer: String, at: Int, results: java.util.List[CharSequence]) = {
+
+        val (before, start) = split(buffer, at)
+
+        env.foreach(f => {
+          val n = f._1.name
+          if (n.startsWith(before)) {
+            results.add(n + " ")
+          }
+        })
+
+        start
+      }
+
+      def split(buffer: String, at: Int): (String, Int) = {
+        val from = math.max(at - 1, 0)
+
+        // TODO: probably a nicer way to write this then nested maxes
+        val lio = math.max(buffer.lastIndexOf(' ', from),
+          math.max(buffer.lastIndexOf('(', from),
+            buffer.lastIndexOf(')', from)))
+        val start = if (lio < at) lio + 1 else at
+        val before = buffer.substring(math.min(start, buffer.length), at)
+
+        (before, start)
+      }
+    }
+
+    console.addCompleter(WispCompleter)
+
+    var count = 0
 
     while (true) {
       val line = console.readLine("~> ")
 
       if (line == null)
-        return ;
+        return
 
       try {
         val processed = Reader(line).foreach { processed =>
 
           val (res, time) = timeFunc(Interpretter.eval(env, processed))
 
-          val summary = "Result: " + res
+          count = count + 1
+          val newSymb = ":res" + count
+          env = env + (Symbol(newSymb) -> res)
+
+          val summary = newSymb + " = " + res
           val info = "[Took " + time + "ms]"
 
           val spaces = console.getTerminal.getWidth - summary.length - info.length
@@ -54,35 +89,5 @@ object Main {
     val s = System.nanoTime
     val ret = f
     (ret, (System.nanoTime - s) / 1e6)
-  }
-}
-
-class WispCompleter(e: Env) extends Completer {
-
-  def complete(buffer: String, at: Int, results: java.util.List[CharSequence]) = {
-
-    val (before, start) = split(buffer, at)
-
-    e.foreach(f => {
-      val n = f._1.name
-      if (n.startsWith(before)) {
-        results.add(n + " ")
-      }
-    })
-
-    start
-  }
-
-  def split(buffer: String, at: Int): (String, Int) = {
-    val from = math.max(at - 1, 0)
-
-    // TODO: probably a nicer way to write this then nested maxes
-    val lio = math.max(buffer.lastIndexOf(' ', from),
-      math.max(buffer.lastIndexOf('(', from),
-        buffer.lastIndexOf(')', from)))
-    val start = if (lio < at) lio + 1 else at
-    val before = buffer.substring(math.min(start, buffer.length), at)
-
-    (before, start)
   }
 }
