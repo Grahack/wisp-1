@@ -3,12 +3,17 @@ package wisp
 import scala.util.parsing.combinator._
 import scala.util.parsing.input.CharSequenceReader
 
+import java.nio.file._
+
 object Reader extends Parsers {
 
   type Elem = Char
 
-  def apply(input: String) = {    
-    val p = rep((atomListParser(0)) <~ rep(eol))(new CharSequenceReader(input))
+  def apply(input: Path) = { 
+    
+    val csr = new CharSequenceReader(new String(Files.readAllBytes(input)))
+
+    val p = rep((atomListParser(0)) <~ rep(eol))(csr)
 
     p match {
       case Success(res, next) if next.atEnd => res

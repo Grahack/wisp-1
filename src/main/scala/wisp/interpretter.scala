@@ -1,31 +1,65 @@
 package wisp
 
+import java.nio.file.Path
+import java.nio.file.Paths
+
 object Interpretter {
 
-  def apply(forms: List[Any]): Any = DoBlock(startingEnv, forms)
+  def apply(path: Path): (Any, Env) = {
 
-  private def startingEnv: Env = new Env() +
-    ('true -> true) +
-    ('false -> false) +
+    val forms = Reader(path)
+
+    val (imports, rest) = forms.span(_ match {
+      case 'import :: _ => true
+      case _ => false
+    })
+
+    val env = if (imports.isEmpty) startingEnv else {
+
+      imports.foldLeft(Map[Symbol, Any]())((e, nextImport) => nextImport match {
+        case 'import :: (importFilePath: String) :: Nil => {
+
+          val ifp = path.resolveSibling(importFilePath)
+
+          val envLookup = Symbol("__wisp_import:" + ifp.toRealPath().normalize().toString())
+
+          if (e.contains(envLookup))
+            e
+          else
+            e ++ Interpretter(ifp)._2 + (envLookup -> true)
+        }
+        case _ => sys.error("Could not understand import")
+      })
+
+    }
+
+    DoBlock.run(env, rest)
+  }
+
+  private def startingEnv: Env = Map[Symbol, Any](
+    ('true -> true),
+    ('false -> false),
     // Some pretty primitive stuff
-    ('do -> DoBlock) +
-    ('eval -> Eval) +
-    ('if -> If) +
-    ('lambda -> Lambda) +
+    ('do -> DoBlock),
+    ('eval -> Eval),
+    ('if -> If),
+    ('lambda -> Lambda),
+    (Symbol("'") -> Quote),
     // some maths stuff
-    (Symbol("+") -> Add) +
-    (Symbol("-") -> Sub) +
-    (Symbol("<") -> LessThan) +
-    (Symbol("<=") -> LessThanOrEqual) +
-    (Symbol("==") -> Equal) +
-    (Symbol(">") -> GreaterThan) +
-    (Symbol(">=") -> GreaterThanOrEqual) +
+    (Symbol("+") -> Add),
+    (Symbol("-") -> Sub),
+    (Symbol("<") -> LessThan),
+    (Symbol("<=") -> LessThanOrEqual),
+    (Symbol("==") -> Equal),
+    (Symbol(">") -> GreaterThan),
+    (Symbol(">=") -> GreaterThanOrEqual),
     // utility like
-    ('str -> Str) +
-    ('nth -> Nth) +
-    ('assert -> Assert) +
+    ('str -> Str),
+    ('nth -> Nth),
+    ('assert -> Assert),
+    ('size -> Size),
     // debug
-    ('trace -> Trace)
+    ('trace -> Trace))
 
   trait WVal {
     def apply(e: Env): Any
@@ -54,7 +88,13 @@ object Interpretter {
   }
 
   object Eval extends WFunc {
-    def apply(e: Env, args: List[Any]) = eval(e, args)
+    def apply(e: Env, args: List[Any]) = {
+      require(args.size == 2)
+
+      eval(
+        eval(e, args(0)).asInstanceOf[Env],
+        eval(e, args(1)))
+    }
   }
 
   object Add extends WFunc {
@@ -77,16 +117,24 @@ object Interpretter {
     }
   }
 
+  object Quote extends WFunc {
+    def apply(e: Env, args: List[Any]) = {
+      require(args.size == 1)
+      args.head // note: not eval'ing it
+    }
+  }
+
   object Lambda extends WFunc {
     def apply(e: Env, args: List[Any]) = {
 
       args match {
-        case (argsS: Symbol) :: code :: Nil => {
+        case (eS: Symbol) :: (argsS: Symbol) :: code :: Nil => {
+          require(!e.contains(eS))
           require(!e.contains(argsS))
+          require(eS != argsS)
           new WFunc {
             def apply(de: Env, args: List[Any]) = {
-              val newEnv = e + (argsS -> args.map(eval(de, _)))
-
+              val newEnv = e + (eS -> de) + (argsS -> args)
               eval(newEnv, code)
             }
           }
@@ -132,7 +180,8 @@ object Interpretter {
   }
 
   object DoBlock extends WFunc {
-    def apply(e: Env, forms: List[Any]): Any = {
+
+    def run(e: Env, forms: List[Any]): (Any, Env) = {
       val (lets, rest) = forms.partition {
         _ match {
           case 'let :: (s: Symbol) :: v :: Nil => true
@@ -143,13 +192,19 @@ object Interpretter {
 
       object LetResult { def apply(v: Any) = new LetResult(v, false) }
 
-      class LetResult(var value: Any, var hasBeenEval: Boolean) extends WVal {
-        def apply(e: Env): Any = {
+      class LetResult(var payload: Any, var hasBeenEval: Boolean) extends WVal {
+                
+        def apply(u: Env): Any = {
+                    
           if (!hasBeenEval) {
-            value = eval(e, value)
+            val (capEnv, original) = payload.asInstanceOf[(Env, Any)]
+            payload = eval(capEnv, original)
             hasBeenEval = true
           }
-          value
+          payload
+        }
+        def setEnv(e: Env) = {
+          payload = (e -> payload)
         }
       }
 
@@ -163,9 +218,17 @@ object Interpretter {
           oldEnv + form
       }
 
+      // Now all our let's need a reference to the env they were defined in
+
+      allLets.foreach { l => l._2.setEnv(newEnv) }
+
       // now that we done all our static environment stuff, we can go through and evaluate it all
 
-      rest.foldLeft(List(): Any)((a, b) => eval(newEnv, b))
+      (rest.foldLeft(List(): Any)((a, b) => eval(newEnv, b)), newEnv)
+    }
+
+    def apply(e: Env, forms: List[Any]): Any = {
+      run(e, forms)._1
     }
   }
 
@@ -199,6 +262,17 @@ object Interpretter {
         sys.error("Code assertion failed!" + (if (args.size == 2) " Message is: " + eval(e, args(1))))
       }
     }
+  }
+
+  object Size extends WFunc {
+    def apply(e: Env, args: List[Any]): Any = {
+      require(args.size == 1)
+      eval(e, args) match {
+        case l: List[_] => l.size
+        case m: Map[_, _] => m.size
+      }
+    }
+
   }
 
 }
