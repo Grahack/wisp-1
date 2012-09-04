@@ -1,44 +1,28 @@
 import "syntax.wisp"
 
-
-; fn (a b c) (+ a b c)
-
-
-vau e a 
+"Here's some really crazy shit"
 
 
 let fn
 	vau e a
 		do
-			let argSymbols (nth 0 a)
-			let body (nth 1 a)
+			let arg-symbols (nth a 0)
+			let body (nth a 1)
 			vau e2 a2
-				eval
-					fold-left argSymbols (list e 0)
-						(state, newArg) =>
-							do
-								let old-env (nth state 0)
-								let count (nth state 1)
-								list
-									map-insert oldE newArg
-									+ count 1
-					
-			
-			
-			
-			map-insert e (nth 0 args)
-;		let b (nth 1 args)
-;		let c (nth 2 args)
-;		+ a b c
+				do
+					let fold-result
+						fold-left arg-symbols (list e 0)
+							vau fe fa
+								do
+									let state (eval fe (nth fa 0))
+									let new-arg (nth fa 1)
+									let old-env (nth state 0)
+									let count (nth state 1)
+									list
+										dict-insert old-env new-arg (eval e2 (nth a2 count))
+										+ count 1
+					let built-env (nth fold-result 0)
+					eval built-env body
 
 
 
-
-
-
-
-
-; match x
-;   (fn (a) (== a 4)) 45
-;   (< 53) 23
-;   

@@ -45,6 +45,10 @@ object Main {
         (before, start)
       }
     }
+    
+    println("Result: " + res)
+    println("~~~Dropping into repl~~~")
+    
 
     console.addCompleter(WispCompleter)
 

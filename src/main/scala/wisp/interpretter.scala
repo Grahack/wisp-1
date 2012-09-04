@@ -49,10 +49,13 @@ object Interpretter {
     (Symbol(">=") -> GreaterThanOrEqual) +
     // utility like
     ('str -> Str) +
-    ('nth -> Nth) +
     ('assert -> Assert) +
-    ('length -> Length) +
     ('map -> MapFunc) + // TODO: in library?
+    // list functions
+    ('nth -> Nth) +
+    ('length -> Length) +
+    ('cons -> Cons) +
+    ('list -> ListFunc) +
     (Symbol("fold-left") -> FoldLeft) +
     // Dict functions
     (Symbol("dict-insert") -> DictInsert) +
@@ -65,7 +68,8 @@ object Interpretter {
     ('and -> And) +
     ('or -> Or) +
     // debug
-    ('trace -> Trace)
+    ('trace -> Trace) +
+    ('fails -> Fails)
 
   trait WVal {
     def apply(e: Dict): Any
@@ -85,7 +89,7 @@ object Interpretter {
       }
       case head :: args => {
         val h = eval(e, head)
-        require(h.isInstanceOf[WFunc])
+        require(h.isInstanceOf[WFunc], "Trying to evaluate non-function: " + h)
         h.asInstanceOf[WFunc](e, args)
       }
       case x => x
@@ -271,10 +275,31 @@ object Interpretter {
       case h :: (tail: List[_]) :: Nil => h :: tail
     }
   }
+  
+  object ListFunc extends StrictFunc {
+    def run = {
+      case args => args
+    }
+  }
 
   object Trace extends StrictFunc {
     def run = {
       case args => println(args.mkString)
+    }
+  }
+
+  object Fails extends WFunc {
+
+    def apply(env: Dict, args: List[Any]) = {
+      require(args.size == 1)
+
+      try {
+        eval(env, args.head)
+        false
+      } catch {
+
+        case _ => true
+      }
     }
   }
 
@@ -318,10 +343,12 @@ object Interpretter {
     def apply(e: Dict, args: List[Any]): Any = {
       require(args.size == 3)
       val list = eval(e, args(0)).asInstanceOf[List[_]]
-      val start = eval(e, args(1))
-      val func = eval(e, args(1)).asInstanceOf[WFunc]
+      val start = args(1)
+      val func = eval(e, args(2)).asInstanceOf[WFunc]
 
-      list.foldLeft(start)((a, b) => func(e, a :: b :: Nil))
+      val res = list.foldLeft(start)((a, b) => Quote :: func(e, a :: b :: Nil) :: Nil )
+      // and now we need to remove the quote part from the return
+      eval(e, res)
     }
   }
 

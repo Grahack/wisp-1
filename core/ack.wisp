@@ -1,24 +1,11 @@
-import "syntax.wisp"
-
-let y 45
+import "util.wisp"
 
 let ack
-	vau e a
+	fn (m n)
 		do
-			let m (eval e (nth a 0))
-			let n (eval e (nth a 1))
 			if (== m 0)
 				+ n 1
 				if (== n 0)
-					ack
-						- m 1
-						, 1
-					ack
-						- m 1
-						ack m
-							- n 1
-
-ack 2 180
-
-
+					ack (- m 1) 1
+					ack (- m 1) (ack m (- n 1))
 
