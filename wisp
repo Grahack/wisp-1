@@ -1,1 +1,1 @@
-java -jar `dirname $0`/target/wisp.jar "$@"
+java -Xss8m -jar `dirname $0`/target/wisp.jar "$@"
