@@ -23,10 +23,10 @@ object Main {
         val (before, start) = split(buffer, at)
 
         env.foreach(f => {
-          val n = f._1.name
-          if (n.startsWith(before)) {
+          // CHECK: the static-env really should never contain non-symbols, eh?
+          val n = f._1.asInstanceOf[Symbol].name
+          if (n.startsWith(before)) 
             results.add(n + " ")
-          }
         })
 
         start

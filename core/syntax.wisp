@@ -1,8 +1,6 @@
-trace "syntax.wisp loaded"
-
 let ;
-	lambda e a 0
+	vau e a ()
 
 let ,
-	lambda e a (eval e (nth a 0))
+	vau e a (eval e (nth a 0))
 

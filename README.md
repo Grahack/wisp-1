@@ -4,7 +4,7 @@ Wisp
 Wisp is a whitespace lisp. It is designed to be extremely powerful and flexible, more so than any other programming language. Interesting features:
 
   * Significant whitespace
-  * [First-class combinators](https://secure.wikimedia.org/wikipedia/en/wiki/Fexpr) (On hold, for now)
+  * [First-class combinators](https://secure.wikimedia.org/wikipedia/en/wiki/Fexpr)
   * Static Scoping with forward references (like you'd expect from a modern language)
   * Very functional
 

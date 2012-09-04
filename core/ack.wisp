@@ -3,7 +3,7 @@ import "syntax.wisp"
 let y 45
 
 let ack
-	lambda e a
+	vau e a
 		do
 			let m (eval e (nth a 0))
 			let n (eval e (nth a 1))
