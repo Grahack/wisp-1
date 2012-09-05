@@ -1,10 +1,9 @@
 package wisp
 
-import java.nio.file.Path
-import java.nio.file.Paths
-import scala.PartialFunction
-
 object Interpretter {
+
+  import java.nio.file.Path
+  import java.nio.file.Paths
 
   def apply(path: Path): (Any, Dict) = {
 
@@ -27,8 +26,15 @@ object Interpretter {
 
     }
 
-    DoBlock.run(env, rest)
+    DoBlockRun(env, rest)
   }
+
+  object WFunc extends Enumeration {
+    type WFunc = Value
+    val Str, Nth, Cons, VecFunc, Trace, Fails, Assert, Length, DictSize, DictGet, FoldLeft, DictInsert, DictRemove, DictContains, Not, And, Or, LessThan, LessThanOrEqual, Equal, GreaterThan, GreaterThanOrEqual, Eval, Add, Sub, If, Quote, Vau, DoBlock = Value
+  }
+
+  import WFunc._
 
   private def startingEnv = Dict() +
     ('true -> true) +
@@ -70,34 +76,26 @@ object Interpretter {
     ('trace -> Trace) +
     ('fails -> Fails)
 
-  trait WVal {
-    def apply(e: Dict): Any
-  }
-
-  trait WProc {
-    def strict: Boolean
-  }
 
   def eval(e: Dict, form: Any): Any = {
     form match {
       case s: Symbol => {
         e(s) match {
-          case v: WVal => v(e)
+          case lr: LetResult => lr()
           case x => x
         }
       }
-      case f +: rawArgs => {
 
-        val which = eval(e, f).asInstanceOf[WProc]
+      case f +: rawArgs => {
 
         def evaledArgs() = rawArgs.map(eval(e, _))
 
-        which match {
+        eval(e, f) match {
           case VauRun(capEnv, envS, argS, capCode) => eval(capEnv + (envS -> e) + (argS -> rawArgs), capCode)
           case Eval => evaledArgs() match {
             case Vect(env: Dict, v) => eval(env, v)
           }
-          case DoBlock => DoBlock.run(e, rawArgs)._1
+          case DoBlock => DoBlockRun(e, rawArgs)._1
           case Equal => foldReduce(_ == _, e, rawArgs)
           case Add => evaledArgs().reduce(_.asInstanceOf[Int] + _.asInstanceOf[Int])
           case Sub => evaledArgs() match {
@@ -159,7 +157,7 @@ object Interpretter {
             case Vect(v, start, f) =>
               val vec = eval(e, v).asInstanceOf[Vect]
               // Note: note evaling 'start' as we're threading it through
-              val func = eval(e, f).asInstanceOf[WProc]
+              val func = eval(e, f)
               eval(e, vec.foldLeft(start)((a, b) => Vect(Quote, eval(e, Vect(func, a, b)))))
           }
           case DictInsert => evaledArgs() match {
@@ -189,31 +187,7 @@ object Interpretter {
     }
   }
 
-  object Eval extends WProc {
-    def strict = true
-  }
-
-  object Add extends WProc {
-    def strict = true
-  }
-
-  object Sub extends WProc {
-    def strict = true
-  }
-
-  object If extends WProc {
-    def strict = false
-  }
-
-  object Quote extends WProc {
-    def strict = false
-  }
-
-  object Vau extends WProc {
-    def strict = false
-  }
-
-  case class VauRun(capEnv: Dict, envS: Symbol, argS: Symbol, capCode: Any) extends WProc {
+  case class VauRun(capEnv: Dict, envS: Symbol, argS: Symbol, capCode: Any) {
     def strict = false
     override def toString = "$vau$" + this
   }
@@ -234,144 +208,52 @@ object Interpretter {
     true
   }
 
-  object LessThan extends WProc {
-    def strict = false
-  }
+  def strict = false
 
-  object LessThanOrEqual extends WProc {
-    def strict = false
-  }
-
-  object Equal extends WProc {
-    def strict = false
-  }
-
-  object GreaterThan extends WProc {
-    def strict = false
-  }
-
-  object GreaterThanOrEqual extends WProc {
-    def strict = false
-  }
-
-  object DoBlock extends WProc {
-
-    def strict = false
-
-    def run(e: Dict, forms: Vect): (Any, Dict) = {
-      val (lets, rest) = forms.partition {
-        _ match {
-          case 'let +: (s: Symbol) +: v +: Vect() => true
-          case 'let +: _ => sys.error("Malformed let")
-          case _ => false
-        }
+  def DoBlockRun(e: Dict, forms: Vect): (Any, Dict) = {
+    val (lets, rest) = forms.partition {
+      _ match {
+        case 'let +: (s: Symbol) +: v +: Vect() => true
+        case 'let +: _ => sys.error("Malformed let")
+        case _ => false
       }
-
-      object LetResult { def apply(v: Any) = new LetResult(v, false) }
-
-      class LetResult(var payload: Any, var hasBeenEval: Boolean) extends WVal {
-
-        def apply(u: Dict): Any = {
-
-          if (!hasBeenEval) {
-            val (capEnv, original) = payload.asInstanceOf[(Dict, Any)]
-            payload = eval(capEnv, original)
-            hasBeenEval = true
-          }
-          payload
-        }
-        def setEnv(e: Dict) = {
-          payload = (e -> payload)
-        }
-      }
-
-      val allLets = lets.data.map(x => { val y = x.asInstanceOf[Vect]; (y(1).asInstanceOf[Symbol] -> LetResult(y(2))) })
-
-      // Now, let's add them all to a new environment
-
-      val newEnv = allLets.foldLeft(e) {
-        (oldEnv, form) =>
-          require(!oldEnv.contains(form._1), "Can't redefine a symbol: " + form._1)
-          oldEnv + form
-      }
-
-      // Now all our let's need a reference to the env they were defined in
-
-      allLets.foreach { l => l._2.setEnv(newEnv) }
-
-      // now that we done all our static environment stuff, we can go through and evaluate it all
-
-      (rest.foldLeft(Vect(): Any)((a, b) => eval(newEnv, b)), newEnv)
     }
 
+    val allLets = lets.data.map(x => { val y = x.asInstanceOf[Vect]; (y(1).asInstanceOf[Symbol] -> LetResult(y(2))) })
+
+    // Now, let's add them all to a new environment
+
+    val newEnv = allLets.foldLeft(e) {
+      (oldEnv, form) =>
+        require(!oldEnv.contains(form._1), "Can't redefine a symbol: " + form._1)
+        oldEnv + form
+    }
+
+    // Now all our let's need a reference to the env they were defined in
+
+    allLets.foreach { l => l._2.setEnv(newEnv) }
+
+    // now that we done all our static environment stuff, we can go through and evaluate it all
+
+    (rest.foldLeft(Vect(): Any)((a, b) => eval(newEnv, b)), newEnv)
   }
 
-  object Str extends WProc {
-    def strict = true
-  }
+  object LetResult { def apply(v: Any) = new LetResult(v, false) }
 
-  object Nth extends WProc {
-    def strict = true
-  }
+  class LetResult(var payload: Any, var hasBeenEval: Boolean) {
 
-  object Cons extends WProc {
-    def strict = true
-  }
+    def apply(): Any = {
 
-  object VecFunc extends WProc {
-    def strict = true
-  }
-
-  object Trace extends WProc {
-    def strict = true
-  }
-
-  object Fails extends WProc {
-    def strict = false
-  }
-
-  object Assert extends WProc {
-    def strict = true
-  }
-
-  object Length extends WProc {
-    def strict = true
-  }
-
-  object DictSize extends WProc {
-    def strict = true
-  }
-
-  object DictGet extends WProc {
-    def strict = true
-  }
-
-  object FoldLeft extends WProc {
-    def strict = false
-  }
-
-  object DictInsert extends WProc {
-    def strict = true
-  }
-
-  object DictRemove extends WProc {
-    def strict = true
-  }
-
-  object DictContains extends WProc {
-    def strict = true
-  }
-
-  object Not extends WProc {
-    def strict = true
-  }
-
-  object And extends WProc {
-    def strict = false
-  }
-
-  object Or extends WProc {
-    def strict = false
+      if (!hasBeenEval) {
+        val (capEnv, original) = payload.asInstanceOf[(Dict, Any)]
+        payload = eval(capEnv, original)
+        hasBeenEval = true
+      }
+      payload
+    }
+    def setEnv(e: Dict) = {
+      payload = (e -> payload)
+    }
   }
 
 }
