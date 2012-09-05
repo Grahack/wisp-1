@@ -1,7 +1,7 @@
 import "syntax.wisp"
 
-"Here's some really crazy shit"
-
+"In terms of vau, let's write fn. Where fn is a strict function"
+"and has a fixed arity"
 
 let fn
 	vau e a
@@ -23,6 +23,3 @@ let fn
 										+ count 1
 					let built-env (nth fold-result 0)
 					eval built-env body
-
-
-

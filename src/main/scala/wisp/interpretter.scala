@@ -11,14 +11,14 @@ object Interpretter {
     val forms = Reader(path)
 
     val (imports, rest) = forms.span(_ match {
-      case 'import :: _ => true
+      case 'import +: _ => true
       case _ => false
     })
 
     val env = if (imports.isEmpty) startingEnv else {
 
       imports.foldLeft(Dict())((e, nextImport) => nextImport match {
-        case 'import :: (importFilePath: String) :: Nil => {
+        case 'import +: (importFilePath: String) +: Vect() => {
           // TODO: avoid double-loading a file
           e merge Interpretter(path.resolveSibling(importFilePath))._2
         }
@@ -51,11 +51,11 @@ object Interpretter {
     ('str -> Str) +
     ('assert -> Assert) +
     ('map -> MapFunc) + // TODO: in library?
-    // list functions
+    // vect functions
     ('nth -> Nth) +
     ('length -> Length) +
     ('cons -> Cons) +
-    ('list -> ListFunc) +
+    ('list -> VecFunc) + // <-- TODO: RENAME
     (Symbol("fold-left") -> FoldLeft) +
     // Dict functions
     (Symbol("dict-insert") -> DictInsert) +
@@ -76,7 +76,7 @@ object Interpretter {
   }
 
   trait WFunc {
-    def apply(e: Dict, args: List[Any]): Any
+    def apply(e: Dict, args: Vect): Any
   }
 
   def eval(e: Dict, form: Any): Any = {
@@ -87,7 +87,7 @@ object Interpretter {
           case x => x
         }
       }
-      case head :: args => {
+      case head +: args => {
         val h = eval(e, head)
         require(h.isInstanceOf[WFunc], "Trying to evaluate non-function: " + h)
         h.asInstanceOf[WFunc](e, args)
@@ -97,8 +97,8 @@ object Interpretter {
   }
 
   object Eval extends WFunc {
-    def apply(e: Dict, args: List[Any]) = {
-      require(args.size == 2)
+    def apply(e: Dict, args: Vect) = {
+      require(args.length == 2)
 
       eval(
         eval(e, args(0)).asInstanceOf[Dict],
@@ -107,55 +107,55 @@ object Interpretter {
   }
 
   trait StrictFunc extends WFunc {
-    def apply(e: Dict, args: List[Any]) = {
-      val evaldArgs = args.map(eval(e, _))
+    def apply(e: Dict, args: Vect) = {
+
+      val evaldArgs = args.map((eval(e, _)))
 
       run(evaldArgs) // TODO: nice error if it doesn't match
     }
 
-    def run: PartialFunction[List[Any], Any]
+    def run: PartialFunction[Vect, Any]
   }
 
   object Add extends StrictFunc {
     def run = {
-      case args => args.map(_.asInstanceOf[Int]).reduce(_ + _)
+      case args => args.reduce(_.asInstanceOf[Int] + _.asInstanceOf[Int])
     }
   }
 
   object Sub extends StrictFunc {
     def run = {
-      case Nil => 0
-      case (v: Int) :: Nil => -v
-      case args =>
-        val values = args.map(_.asInstanceOf[Int])
-        values.head - values.tail.reduce(_ + _)
+      case Vect() => 0
+      case (v: Int) +: Vect() => -v
+      case (head: Int) +: rest =>
+        head - rest.reduce(_.asInstanceOf[Int] + _.asInstanceOf[Int]).asInstanceOf[Int]
     }
   }
 
   object If extends WFunc {
-    def apply(e: Dict, args: List[Any]) = {
-      require(args.size == 3)
+    def apply(e: Dict, args: Vect) = {
+      require(args.length == 3)
       if (eval(e, args(0)).asInstanceOf[Boolean]) eval(e, args(1)) else eval(e, args(2))
     }
   }
 
   object Quote extends WFunc {
-    def apply(e: Dict, args: List[Any]) = {
-      require(args.size == 1)
+    def apply(e: Dict, args: Vect) = {
+      require(args.length == 1)
       args.head // note: not eval'ing it
     }
   }
 
   object Vau extends WFunc {
-    def apply(e: Dict, args: List[Any]) = {
+    def apply(e: Dict, args: Vect) = {
 
       args match {
-        case (eS: Symbol) :: (argsS: Symbol) :: code :: Nil => {
+        case Vect(eS: Symbol, argsS: Symbol, code) => {
           require(!e.contains(eS))
           require(!e.contains(argsS))
           require(eS != argsS)
           new WFunc {
-            def apply(de: Dict, args: List[Any]) = {
+            def apply(de: Dict, args: Vect) = {
               val newEnv = e + (eS -> de) + (argsS -> args)
               eval(newEnv, code)
             }
@@ -166,8 +166,8 @@ object Interpretter {
     }
   }
 
-  def foldReduce(op: (Int, Int) => Boolean, e: Dict, args: List[Any]): Boolean = {
-    require(args.size > 1)
+  def foldReduce(op: (Int, Int) => Boolean, e: Dict, args: Vect): Boolean = {
+    require(args.length > 1)
     var acc = eval(e, args.head).asInstanceOf[Int]
 
     args.tail.foreach { a =>
@@ -182,32 +182,32 @@ object Interpretter {
   }
 
   object LessThan extends WFunc {
-    def apply(e: Dict, args: List[Any]): Boolean = foldReduce(_ < _, e, args)
+    def apply(e: Dict, args: Vect): Boolean = foldReduce(_ < _, e, args)
   }
 
   object LessThanOrEqual extends WFunc {
-    def apply(e: Dict, args: List[Any]): Boolean = foldReduce(_ <= _, e, args)
+    def apply(e: Dict, args: Vect): Boolean = foldReduce(_ <= _, e, args)
   }
 
   object Equal extends WFunc {
-    def apply(e: Dict, args: List[Any]): Boolean = foldReduce(_ == _, e, args)
+    def apply(e: Dict, args: Vect): Boolean = foldReduce(_ == _, e, args)
   }
 
   object GreaterThan extends WFunc {
-    def apply(e: Dict, args: List[Any]): Boolean = foldReduce(_ > _, e, args)
+    def apply(e: Dict, args: Vect): Boolean = foldReduce(_ > _, e, args)
   }
 
   object GreaterThanOrEqual extends WFunc {
-    def apply(e: Dict, args: List[Any]): Boolean = foldReduce(_ >= _, e, args)
+    def apply(e: Dict, args: Vect): Boolean = foldReduce(_ >= _, e, args)
   }
 
   object DoBlock extends WFunc {
 
-    def run(e: Dict, forms: List[Any]): (Any, Dict) = {
+    def run(e: Dict, forms: Vect): (Any, Dict) = {
       val (lets, rest) = forms.partition {
         _ match {
-          case 'let :: (s: Symbol) :: v :: Nil => true
-          case 'let :: _ => sys.error("Malformed let")
+          case 'let +: (s: Symbol) +: v +: Vect() => true
+          case 'let +: _ => sys.error("Malformed let")
           case _ => false
         }
       }
@@ -230,7 +230,7 @@ object Interpretter {
         }
       }
 
-      val allLets = lets.map(x => { val y = x.asInstanceOf[List[Any]]; (y(1).asInstanceOf[Symbol] -> LetResult(y(2))) })
+      val allLets = lets.data.map(x => { val y = x.asInstanceOf[Vect]; (y(1).asInstanceOf[Symbol] -> LetResult(y(2))) })
 
       // Now, let's add them all to a new environment
 
@@ -246,10 +246,10 @@ object Interpretter {
 
       // now that we done all our static environment stuff, we can go through and evaluate it all
 
-      (rest.foldLeft(List(): Any)((a, b) => eval(newEnv, b)), newEnv)
+      (rest.foldLeft(Vect(): Any)((a, b) => eval(newEnv, b)), newEnv)
     }
 
-    def apply(e: Dict, forms: List[Any]): Any = {
+    def apply(e: Dict, forms: Vect): Any = {
       run(e, forms)._1
     }
   }
@@ -266,17 +266,17 @@ object Interpretter {
 
   object Nth extends StrictFunc {
     def run = {
-      case (value: List[_]) :: (index: Int) :: Nil => value(index)
+      case (value: Vect) +: (index: Int) +: Vect() => value(index)
     }
   }
 
   object Cons extends StrictFunc {
     def run = {
-      case h :: (tail: List[_]) :: Nil => h :: tail
+      case h +: (tail: Vect) +: Vect() => Vect(h, tail)
     }
   }
-  
-  object ListFunc extends StrictFunc {
+
+  object VecFunc extends StrictFunc {
     def run = {
       case args => args
     }
@@ -290,8 +290,8 @@ object Interpretter {
 
   object Fails extends WFunc {
 
-    def apply(env: Dict, args: List[Any]) = {
-      require(args.size == 1)
+    def apply(env: Dict, args: Vect) = {
+      require(args.length == 1)
 
       try {
         eval(env, args.head)
@@ -305,48 +305,48 @@ object Interpretter {
 
   object Assert extends StrictFunc {
     def run = {
-      case (res: Boolean) :: Nil => if (!res) sys.error("Code assertion failed!")
-      case (res: Boolean) :: (msg: String) :: Nil => if (!res) sys.error("Code assertion failed, with errror: " + msg)
+      case (res: Boolean) +: Vect() => if (!res) sys.error("Code assertion failed!")
+      case (res: Boolean) +: (msg: String) +: Vect() => if (!res) sys.error("Code assertion failed, with errror: " + msg)
     }
   }
 
   object Length extends StrictFunc {
     def run = {
-      case (l: List[_]) :: Nil => l.length
+      case (l: Vect) +: Vect() => l.length
     }
   }
 
   object DictSize extends StrictFunc {
     def run = {
-      case (lu: Dict) :: Nil => lu.size
+      case (lu: Dict) +: Vect() => lu.size
     }
   }
 
   object DictGet extends StrictFunc {
     def run = {
-      case (lu: Dict) :: k :: Nil => lu(k)
+      case (lu: Dict) +: k +: Vect() => lu(k)
     }
   }
 
   // TODO: this should be able to be a StricTfunc, but we need access to 'e' to call 'f'
   object MapFunc extends WFunc {
-    def apply(e: Dict, args: List[Any]): Any = {
-      require(args.size == 2)
+    def apply(e: Dict, args: Vect): Any = {
+      require(args.length == 2)
       val f = eval(e, args(0)).asInstanceOf[WFunc]
-      val l = eval(e, args(1)).asInstanceOf[List[_]]
+      val l = eval(e, args(1)).asInstanceOf[Vect]
 
-      l.map(x => f(e, x :: Nil))
+      l.map(x => f(e, Vect(x)))
     }
   }
 
   object FoldLeft extends WFunc {
-    def apply(e: Dict, args: List[Any]): Any = {
-      require(args.size == 3)
-      val list = eval(e, args(0)).asInstanceOf[List[_]]
+    def apply(e: Dict, args: Vect): Any = {
+      require(args.length == 3)
+      val vec = eval(e, args(0)).asInstanceOf[Vect]
       val start = args(1)
       val func = eval(e, args(2)).asInstanceOf[WFunc]
 
-      val res = list.foldLeft(start)((a, b) => Quote :: func(e, a :: b :: Nil) :: Nil )
+      val res = vec.foldLeft(start)((a, b) => Vect(Quote, func(e, Vect(a, b))))
       // and now we need to remove the quote part from the return
       eval(e, res)
     }
@@ -354,7 +354,7 @@ object Interpretter {
 
   object DictInsert extends StrictFunc {
     def run = {
-      case (lu: Dict) :: k :: v :: Nil => {
+      case (lu: Dict) +: k +: v +: Vect() => {
         lu + (k -> v)
       }
     }
@@ -362,26 +362,26 @@ object Interpretter {
 
   object DictRemove extends StrictFunc {
     def run = {
-      case (lu: Dict) :: k :: nil => lu - k
+      case (lu: Dict) +: k +: Vect() => lu - k
     }
   }
 
   object DictContains extends StrictFunc {
     def run = {
-      case (lu: Dict) :: k :: Nil => lu.contains(k)
+      case (lu: Dict) +: k +: Vect() => lu.contains(k)
     }
   }
 
   object Not extends StrictFunc {
     def run = {
-      case (arg: Boolean) :: Nil => !arg
+      case (arg: Boolean) +: Vect() => !arg
     }
   }
 
   object And extends WFunc {
-    def apply(e: Dict, args: List[Any]): Boolean = {
+    def apply(e: Dict, args: Vect): Boolean = {
 
-      require(args.size >= 2)
+      require(args.length >= 2)
 
       args.foreach { v =>
         if (eval(e, v).asInstanceOf[Boolean] == false)
@@ -394,8 +394,8 @@ object Interpretter {
   }
 
   object Or extends WFunc {
-    def apply(e: Dict, args: List[Any]): Boolean = {
-      require(args.size >= 2)
+    def apply(e: Dict, args: Vect): Boolean = {
+      require(args.length >= 2)
 
       args.foreach { v =>
         if (eval(e, v).asInstanceOf[Boolean] == true)

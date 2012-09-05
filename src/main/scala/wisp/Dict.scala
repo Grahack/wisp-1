@@ -6,7 +6,7 @@ object Dict {
   def apply() = new Dict(scala.collection.immutable.HashMap[Any, Any]())
 }
 
-class Dict(data: scala.collection.immutable.HashMap[Any, Any]) {
+class Dict(val data: scala.collection.immutable.HashMap[Any, Any]) {
 
   def +(elem: (Any, Any)): Dict = {
     require(!data.contains(elem._1))
@@ -20,7 +20,7 @@ class Dict(data: scala.collection.immutable.HashMap[Any, Any]) {
 
   def merge(r: Dict): Dict = {
     // TODO: something smart
-    new Dict(data ++ r.raw)
+    new Dict(data ++ r.data)
   }
   
   def foreach(f: ((Any,Any)) => Unit) = data.foreach(f)
@@ -32,6 +32,4 @@ class Dict(data: scala.collection.immutable.HashMap[Any, Any]) {
   def get(k: Any) = data.get(k)
 
   def size = data.size
-
-  def raw = data
 }
