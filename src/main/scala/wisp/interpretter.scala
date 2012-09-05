@@ -75,99 +75,124 @@ object Interpretter {
     def apply(e: Dict): Any
   }
 
-  trait WFunc {
-    def apply(e: Dict, args: Vect): Any
+  trait WProc {
+    def strict: Boolean
   }
 
   def eval(e: Dict, form: Any): Any = {
     form match {
       case s: Symbol => {
         e(s) match {
-          case v: WVal => v.apply(e)
+          case v: WVal => v(e)
           case x => x
         }
       }
-      case head +: args => {
-        val h = eval(e, head)
-        require(h.isInstanceOf[WFunc], "Trying to evaluate non-function: " + h)
-        h.asInstanceOf[WFunc](e, args)
+      case f +: rest => {
+        val h = eval(e, f)
+
+        require(h.isInstanceOf[WProc], "Trying to evaluate non-function: " + h)
+        // h.asInstanceOf[WFunc](e, args)
+
+        val params = if (h.asInstanceOf[WProc].strict) rest.map(eval(e, _)) else rest
+
+        (h, params) match {
+          case (VauRun(capEnv, envS, argS, capCode), args) => eval(capEnv + (envS -> e) + (argS -> args), capCode)
+          case (Eval, Vect(env: Dict, v)) => eval(env, v)
+          case (DoBlock, args) => DoBlock.run(e, args)._1
+          case (Equal, args) => foldReduce(_ == _, e, args)
+          case (Add, args) => { args.reduce(_.asInstanceOf[Int] + _.asInstanceOf[Int]) }
+          case (Sub, Vect()) => 0
+          case (Sub, (v: Int) +: Vect()) => -v
+          case (Sub, (head: Int) +: rest) => head - rest.reduce(_.asInstanceOf[Int] + _.asInstanceOf[Int]).asInstanceOf[Int]
+          case (If, cond +: trueCase +: falseCase +: Vect()) => if (eval(e, cond).asInstanceOf[Boolean]) eval(e, trueCase) else eval(e, falseCase)
+          case (Quote, arg +: Vect()) => arg
+          case (Vau, Vect(envS: Symbol, argS: Symbol, code)) => {
+            require(!e.contains(envS))
+            require(!e.contains(argS))
+            require(envS != argS)
+            VauRun(e, envS, argS, code)
+          }
+          case (LessThan, args) => foldReduce(_ < _, e, args)
+          case (LessThanOrEqual, args) => foldReduce(_ <= _, e, args)
+          case (GreaterThan, args) => foldReduce(_ > _, e, args)
+          case (Str, args) => {
+            val sb = new StringBuilder()
+            args.foreach(sb.append(_))
+            sb.result()
+          }
+          case (Nth, Vect(value: Vect, index: Int)) => value(index)
+          case (Cons, Vect(h, tail: Vect)) => tail.cons(h)
+          case (VecFunc, args) => args
+          case (Trace, args) => println(args.mkString)
+          case (Fails, Vect(arg)) => try {
+            eval(e, arg)
+            false
+          } catch {
+            case _ => true
+          }
+          case (Assert, Vect(res: Boolean)) => if (!res) sys.error("Code assertion failed!")
+          case (Assert, Vect(res: Boolean, msg: String)) => if (!res) sys.error("Code assertion failed, with errror: " + msg)
+          case (Length, Vect(vec: Vect)) => vec.length
+          case (DictSize, Vect(dict: Dict)) => dict.size
+          case (DictGet, Vect(dict: Dict, k)) => dict(k)
+          case (MapFunc, Vect(vec: Vect, f: WProc)) => vec.map(x => eval(e, Vect(f, x)))
+          case (FoldLeft, Vect(v, start, f)) => {
+            val vec = eval(e, v).asInstanceOf[Vect]
+            // Note: note evaling 'start' as we're threading it through
+            val func = eval(e, f).asInstanceOf[WProc]
+            eval(e, vec.foldLeft(start)((a, b) => Vect(Quote, eval(e, Vect(func, a, b)))))
+          }
+          case (DictInsert, Vect((lu: Dict), k, v)) => lu + (k -> v)
+          case (DictRemove, Vect(lu: Dict, k)) => lu - k
+          case (DictContains, Vect(lu: Dict, k)) => lu.contains(k)
+          case (Not, Vect(arg: Boolean)) => !arg
+          case (And, args) => {
+            require(args.length >= 2)
+            args.data.forall(eval(e, _).asInstanceOf[Boolean] == true)
+          }
+          case (Or, args) => {
+            require(args.length >= 2)
+            !args.data.forall(eval(e, _).asInstanceOf[Boolean] == false)
+          }
+
+        }
       }
       case x => x
     }
   }
 
-  object Eval extends WFunc {
-    def apply(e: Dict, args: Vect) = {
-      require(args.length == 2)
-
-      eval(
-        eval(e, args(0)).asInstanceOf[Dict],
-        eval(e, args(1)))
-    }
+  object Eval extends WProc {
+    def strict = true
   }
 
-  trait StrictFunc extends WFunc {
-    def apply(e: Dict, args: Vect) = {
-
-      val evaldArgs = args.map((eval(e, _)))
-
-      run(evaldArgs) // TODO: nice error if it doesn't match
-    }
-
-    def run: PartialFunction[Vect, Any]
+  object Add extends WProc {
+    def strict = true
   }
 
-  object Add extends StrictFunc {
-    def run = {
-      case args => args.reduce(_.asInstanceOf[Int] + _.asInstanceOf[Int])
-    }
+  object Sub extends WProc {
+    def strict = true
   }
 
-  object Sub extends StrictFunc {
-    def run = {
-      case Vect() => 0
-      case (v: Int) +: Vect() => -v
-      case (head: Int) +: rest =>
-        head - rest.reduce(_.asInstanceOf[Int] + _.asInstanceOf[Int]).asInstanceOf[Int]
-    }
+  object If extends WProc {
+    def strict = false
   }
 
-  object If extends WFunc {
-    def apply(e: Dict, args: Vect) = {
-      require(args.length == 3)
-      if (eval(e, args(0)).asInstanceOf[Boolean]) eval(e, args(1)) else eval(e, args(2))
-    }
+  object Quote extends WProc {
+    def strict = false
   }
 
-  object Quote extends WFunc {
-    def apply(e: Dict, args: Vect) = {
-      require(args.length == 1)
-      args.head // note: not eval'ing it
-    }
+  object Vau extends WProc {
+    def strict = false
   }
 
-  object Vau extends WFunc {
-    def apply(e: Dict, args: Vect) = {
-
-      args match {
-        case Vect(eS: Symbol, argsS: Symbol, code) => {
-          require(!e.contains(eS))
-          require(!e.contains(argsS))
-          require(eS != argsS)
-          new WFunc {
-            def apply(de: Dict, args: Vect) = {
-              val newEnv = e + (eS -> de) + (argsS -> args)
-              eval(newEnv, code)
-            }
-          }
-        }
-        case a => sys.error("Unknown args for a lambda expression: " + a)
-      }
-    }
+  case class VauRun(capEnv: Dict, envS: Symbol, argS: Symbol, capCode: Any) extends WProc {
+    def strict = false
+    override def toString = "$vau$" + this
   }
 
   def foldReduce(op: (Int, Int) => Boolean, e: Dict, args: Vect): Boolean = {
     require(args.length > 1)
+
     var acc = eval(e, args.head).asInstanceOf[Int]
 
     args.tail.foreach { a =>
@@ -181,27 +206,29 @@ object Interpretter {
     true
   }
 
-  object LessThan extends WFunc {
-    def apply(e: Dict, args: Vect): Boolean = foldReduce(_ < _, e, args)
+  object LessThan extends WProc {
+    def strict = false
   }
 
-  object LessThanOrEqual extends WFunc {
-    def apply(e: Dict, args: Vect): Boolean = foldReduce(_ <= _, e, args)
+  object LessThanOrEqual extends WProc {
+    def strict = false
   }
 
-  object Equal extends WFunc {
-    def apply(e: Dict, args: Vect): Boolean = foldReduce(_ == _, e, args)
+  object Equal extends WProc {
+    def strict = false
   }
 
-  object GreaterThan extends WFunc {
-    def apply(e: Dict, args: Vect): Boolean = foldReduce(_ > _, e, args)
+  object GreaterThan extends WProc {
+    def strict = false
   }
 
-  object GreaterThanOrEqual extends WFunc {
-    def apply(e: Dict, args: Vect): Boolean = foldReduce(_ >= _, e, args)
+  object GreaterThanOrEqual extends WProc {
+    def strict = false
   }
 
-  object DoBlock extends WFunc {
+  object DoBlock extends WProc {
+
+    def strict = false
 
     def run(e: Dict, forms: Vect): (Any, Dict) = {
       val (lets, rest) = forms.partition {
@@ -249,161 +276,78 @@ object Interpretter {
       (rest.foldLeft(Vect(): Any)((a, b) => eval(newEnv, b)), newEnv)
     }
 
-    def apply(e: Dict, forms: Vect): Any = {
-      run(e, forms)._1
-    }
   }
 
-  object Str extends StrictFunc {
-    def run = {
-      case args =>
-        val sb = new StringBuilder()
-        args.foreach(sb.append(_))
-        sb.result()
-    }
-
+  object Str extends WProc {
+    def strict = true
   }
 
-  object Nth extends StrictFunc {
-    def run = {
-      case (value: Vect) +: (index: Int) +: Vect() => value(index)
-    }
+  object Nth extends WProc {
+    def strict = true
   }
 
-  object Cons extends StrictFunc {
-    def run = {
-      case h +: (tail: Vect) +: Vect() => Vect(h, tail)
-    }
+  object Cons extends WProc {
+    def strict = true
   }
 
-  object VecFunc extends StrictFunc {
-    def run = {
-      case args => args
-    }
+  object VecFunc extends WProc {
+    def strict = true
   }
 
-  object Trace extends StrictFunc {
-    def run = {
-      case args => println(args.mkString)
-    }
+  object Trace extends WProc {
+    def strict = true
   }
 
-  object Fails extends WFunc {
-
-    def apply(env: Dict, args: Vect) = {
-      require(args.length == 1)
-
-      try {
-        eval(env, args.head)
-        false
-      } catch {
-
-        case _ => true
-      }
-    }
+  object Fails extends WProc {
+    def strict = false
   }
 
-  object Assert extends StrictFunc {
-    def run = {
-      case (res: Boolean) +: Vect() => if (!res) sys.error("Code assertion failed!")
-      case (res: Boolean) +: (msg: String) +: Vect() => if (!res) sys.error("Code assertion failed, with errror: " + msg)
-    }
+  object Assert extends WProc {
+    def strict = true
   }
 
-  object Length extends StrictFunc {
-    def run = {
-      case (l: Vect) +: Vect() => l.length
-    }
+  object Length extends WProc {
+    def strict = true
   }
 
-  object DictSize extends StrictFunc {
-    def run = {
-      case (lu: Dict) +: Vect() => lu.size
-    }
+  object DictSize extends WProc {
+    def strict = true
   }
 
-  object DictGet extends StrictFunc {
-    def run = {
-      case (lu: Dict) +: k +: Vect() => lu(k)
-    }
+  object DictGet extends WProc {
+    def strict = true
   }
 
-  // TODO: this should be able to be a StricTfunc, but we need access to 'e' to call 'f'
-  object MapFunc extends WFunc {
-    def apply(e: Dict, args: Vect): Any = {
-      require(args.length == 2)
-      val f = eval(e, args(0)).asInstanceOf[WFunc]
-      val l = eval(e, args(1)).asInstanceOf[Vect]
-
-      l.map(x => f(e, Vect(x)))
-    }
+  object MapFunc extends WProc {
+    def strict = true
   }
 
-  object FoldLeft extends WFunc {
-    def apply(e: Dict, args: Vect): Any = {
-      require(args.length == 3)
-      val vec = eval(e, args(0)).asInstanceOf[Vect]
-      val start = args(1)
-      val func = eval(e, args(2)).asInstanceOf[WFunc]
-
-      val res = vec.foldLeft(start)((a, b) => Vect(Quote, func(e, Vect(a, b))))
-      // and now we need to remove the quote part from the return
-      eval(e, res)
-    }
+  object FoldLeft extends WProc {
+    def strict = false
   }
 
-  object DictInsert extends StrictFunc {
-    def run = {
-      case (lu: Dict) +: k +: v +: Vect() => {
-        lu + (k -> v)
-      }
-    }
+  object DictInsert extends WProc {
+    def strict = true
   }
 
-  object DictRemove extends StrictFunc {
-    def run = {
-      case (lu: Dict) +: k +: Vect() => lu - k
-    }
+  object DictRemove extends WProc {
+    def strict = true
   }
 
-  object DictContains extends StrictFunc {
-    def run = {
-      case (lu: Dict) +: k +: Vect() => lu.contains(k)
-    }
+  object DictContains extends WProc {
+    def strict = true
   }
 
-  object Not extends StrictFunc {
-    def run = {
-      case (arg: Boolean) +: Vect() => !arg
-    }
+  object Not extends WProc {
+    def strict = true
   }
 
-  object And extends WFunc {
-    def apply(e: Dict, args: Vect): Boolean = {
-
-      require(args.length >= 2)
-
-      args.foreach { v =>
-        if (eval(e, v).asInstanceOf[Boolean] == false)
-          return false
-      }
-
-      true
-
-    }
+  object And extends WProc {
+    def strict = false
   }
 
-  object Or extends WFunc {
-    def apply(e: Dict, args: Vect): Boolean = {
-      require(args.length >= 2)
-
-      args.foreach { v =>
-        if (eval(e, v).asInstanceOf[Boolean] == true)
-          return true
-      }
-
-      false
-    }
+  object Or extends WProc {
+    def strict = false
   }
 
 }
