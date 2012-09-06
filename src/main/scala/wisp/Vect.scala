@@ -25,9 +25,12 @@ class Vect(val data: Vector[Any]) {
   def cons(v: Any): Any = new Vect(v +: data)
   def append(v: Any) = new Vect(data :+ v)
 
+  def drop(n: Int) = new Vect(data.drop(n))
+  
   def reverse = new Vect(data.reverse)
 
   def isEmpty = data.isEmpty
+  def nonEmpty = data.nonEmpty
   def length = data.length
 
   def foldLeft[B](z: B)(op: (B, Any) => B): B = {

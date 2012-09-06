@@ -1,5 +1,8 @@
 package wisp
 
+import com.sun.org.apache.xpath.internal.objects.GreaterThanOrEqualComparator
+import scala.xml.TypeSymbol
+
 object Interpretter {
 
   import java.nio.file.Path
@@ -31,36 +34,54 @@ object Interpretter {
 
   object WFunc extends Enumeration {
     type WFunc = Value
-    val Str, Nth, Cons, VecFunc, Trace, Fails, Assert, Length, DictSize, DictGet, FoldLeft, DictInsert, DictRemove, DictContains, Not, And, Or, LessThan, LessThanOrEqual, Equal, GreaterThan, GreaterThanOrEqual, Eval, Add, Sub, If, Quote, Vau, DoBlock = Value
+    val TypeOf, TypeEq, Str, Nth, Drop, Cons, VecFunc, Trace, Fails, Assert, Length, DictSize, DictGet, FoldLeft, DictInsert, DictRemove, DictContains, Not, And, Or, LessThan, LessThanOrEqual, NumEq, GreaterThan, GreaterThanOrEqual, Eval, Add, Sub, If, Quote, Vau, DoBlock, NumToString = Value
   }
 
+  object WTypes extends Enumeration {
+    type WType = Value
+    val TypeBool, TypeSym, TypeNum, TypeDict, TypeStr, TypeVect, TypeType = Value
+  }
+
+  import WTypes._
   import WFunc._
 
   private def startingEnv = Dict() +
     ('true -> true) +
     ('false -> false) +
+    // Types
+    ('Num -> TypeNum) +
+    ('Str -> TypeStr) +
+    ('Bool -> TypeBool) +
+    ('Vect -> TypeVect) +
+    ('Sym -> TypeSym) +
+    ('Dict -> TypeDict) +
+    ('Type -> TypeType) +
+    (Symbol("type-of") -> TypeOf) +
+    (Symbol("type-eq") -> TypeEq) +
     // Some pretty primitive stuff
     ('do -> DoBlock) +
     ('eval -> Eval) +
     ('if -> If) +
     ('vau -> Vau) +
     (Symbol("'") -> Quote) +
-    // some maths stuff
-    (Symbol("+") -> Add) +
-    (Symbol("-") -> Sub) +
-    (Symbol("<") -> LessThan) +
-    (Symbol("<=") -> LessThanOrEqual) +
-    (Symbol("==") -> Equal) +
-    (Symbol(">") -> GreaterThan) +
-    (Symbol(">=") -> GreaterThanOrEqual) +
+    // some num stuff
+    (Symbol("num-add") -> Add) +
+    (Symbol("num-sub") -> Sub) +
+    (Symbol("num-lt") -> LessThan) +
+    (Symbol("num-lte") -> LessThanOrEqual) +
+    (Symbol("num-eq") -> NumEq) +
+    (Symbol("num-gt") -> GreaterThan) +
+    (Symbol("num-gte") -> GreaterThanOrEqual) +
+    (Symbol("num-to-str") -> NumToString) +
     // utility like
     ('str -> Str) +
     ('assert -> Assert) +
     // vect functions
     ('nth -> Nth) +
+    ('drop -> Drop) +
     ('length -> Length) +
     ('cons -> Cons) +
-    ('list -> VecFunc) + // <-- TODO: RENAME
+    ('vect -> VecFunc) +
     (Symbol("fold-left") -> FoldLeft) +
     // Dict functions
     (Symbol("dict-insert") -> DictInsert) +
@@ -76,10 +97,11 @@ object Interpretter {
     ('trace -> Trace) +
     ('fails -> Fails)
 
-
   def eval(e: Dict, form: Any): Any = {
     form match {
+      case lr: LetResult => lr()
       case s: Symbol => {
+        require(s != Symbol("_"), "You really shouldn't use _ as a resolvable symbol")
         e(s) match {
           case lr: LetResult => lr()
           case x => x
@@ -96,12 +118,14 @@ object Interpretter {
             case Vect(env: Dict, v) => eval(env, v)
           }
           case DoBlock => DoBlockRun(e, rawArgs)._1
-          case Equal => foldReduce(_ == _, e, rawArgs)
-          case Add => evaledArgs().reduce(_.asInstanceOf[Int] + _.asInstanceOf[Int])
+          case NumEq => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a == b
+          }
+          case Add => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a + b
+          }
           case Sub => evaledArgs() match {
-            case Vect() => 0
-            case Vect(v: Int) => -v
-            case (head: Int) +: rest => head - rest.reduce(_.asInstanceOf[Int] + _.asInstanceOf[Int]).asInstanceOf[Int]
+            case Vect(a: Int, b: Int) => a - b
           }
           case If => rawArgs match {
             case Vect(cond, trueCase, falseCase) => if (eval(e, cond).asInstanceOf[Boolean]) eval(e, trueCase) else eval(e, falseCase)
@@ -111,14 +135,37 @@ object Interpretter {
           }
           case Vau => rawArgs match {
             case Vect(envS: Symbol, argS: Symbol, code) =>
-              require(!e.contains(envS))
-              require(!e.contains(argS))
+              require(!e.contains(envS), "Can't use symbol " + envS + " for binding an environment, as it already exists")
+              require(!e.contains(argS), "Can't use symbol " + argS + " for binding an argument list, as it already exists")
               require(envS != argS)
               VauRun(e, envS, argS, code)
           }
-          case LessThan => foldReduce(_ < _, e, rawArgs)
-          case LessThanOrEqual => foldReduce(_ <= _, e, rawArgs)
-          case GreaterThan => foldReduce(_ > _, e, rawArgs)
+          case LessThan => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a < b
+          }
+          case LessThanOrEqual => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a <= b
+          }
+          case GreaterThan => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a > b
+          }
+          case GreaterThanOrEqual => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a >= b
+          }
+          case NumToString => evaledArgs() match {
+            case Vect(a: Int) => a.toString()
+          }
+          case TypeOf => evaledArgs() match {
+            case Vect(a) => a match {
+              case _: Boolean => TypeBool
+              case _: Int => TypeNum
+              case _: String => TypeStr
+              case _: Symbol => TypeSym
+              case _: Vect => TypeVect
+              case _: Dict => TypeDict
+              case _: WType => TypeType
+            }
+          }
           case Str => {
             val sb = new StringBuilder()
             rawArgs.foreach(x => sb.append(eval(e, x)))
@@ -126,6 +173,9 @@ object Interpretter {
           }
           case Nth => evaledArgs() match {
             case Vect(value: Vect, index: Int) => value(index)
+          }
+          case Drop => evaledArgs() match {
+            case Vect(value: Vect, amount: Int) => value.drop(amount)
           }
           case Cons => evaledArgs() match {
             case Vect(h, tail: Vect) => tail.cons(h)
@@ -180,6 +230,9 @@ object Interpretter {
             require(rawArgs.length >= 2)
             !rawArgs.data.forall(eval(e, _).asInstanceOf[Boolean] == false)
           }
+          case TypeEq => evaledArgs() match {
+            case Vect(a: WType, b: WType) => a == b
+          }
 
         }
       }
@@ -188,7 +241,6 @@ object Interpretter {
   }
 
   case class VauRun(capEnv: Dict, envS: Symbol, argS: Symbol, capCode: Any) {
-    def strict = false
     override def toString = "$vau$" + this
   }
 
@@ -211,27 +263,69 @@ object Interpretter {
   def strict = false
 
   def DoBlockRun(e: Dict, forms: Vect): (Any, Dict) = {
-    val (lets, rest) = forms.partition {
+
+    def letBuilder(form: Any, v: LetResult): Iterable[(Option[Symbol], LetResult)] = {
+
+      form match {
+        case Symbol("_") => None
+        case s: Symbol => Iterable(Some(s) -> v)
+        case pattern: Vect => {
+          require(pattern.nonEmpty)
+
+          val (single, multi) = pattern.span(_ != Symbol("&"))
+
+          val built = (None -> v) +: single.data.zipWithIndex.flatMap {
+            case (s, i) => letBuilder(s, LetResult(Vect(Nth, v, i)))
+          }
+
+          if (multi.nonEmpty) {
+            assert(multi(0) == Symbol("&"))
+            require(multi.length == 2)
+
+            v.setCheck(_.asInstanceOf[Vect].length >= single.length)
+
+            (Some(multi(1).asInstanceOf[Symbol]) -> LetResult(Vect(Drop, v, single.length))) +: built
+
+          } else {
+            v.setCheck(_.asInstanceOf[Vect].length == single.length)
+            built
+          }
+
+        }
+        case x => sys.error("Unknown form: " + x + " in let")
+      }
+
+    }
+
+    val lets = forms.data.flatMap {
       _ match {
-        case 'let +: (s: Symbol) +: v +: Vect() => true
-        case 'let +: _ => sys.error("Malformed let")
-        case _ => false
+        case Vect('let, binding, v) => letBuilder(binding, LetResult(v))
+        case 'let +: _ => sys.error("Malformed let statement")
+        case _ => None
       }
     }
 
-    val allLets = lets.data.map(x => { val y = x.asInstanceOf[Vect]; (y(1).asInstanceOf[Symbol] -> LetResult(y(2))) })
+    val rest = forms.data.flatMap {
+      _ match {
+        case 'let +: _ => None
+        case x => Some(x)
+      }
+    }
 
     // Now, let's add them all to a new environment
 
-    val newEnv = allLets.foldLeft(e) {
+    val newEnv = lets.foldLeft(e) {
       (oldEnv, form) =>
-        require(!oldEnv.contains(form._1), "Can't redefine a symbol: " + form._1)
-        oldEnv + form
+        form._1.map {
+          name =>
+            require(!oldEnv.contains(name), "Can't redefine a symbol: " + name)
+            oldEnv + (name -> form._2)
+        }.getOrElse(oldEnv)
     }
 
     // Now all our let's need a reference to the env they were defined in
 
-    allLets.foreach { l => l._2.setEnv(newEnv) }
+    lets.foreach { l => l._2.setEnv(newEnv) }
 
     // now that we done all our static environment stuff, we can go through and evaluate it all
 
@@ -240,17 +334,25 @@ object Interpretter {
 
   object LetResult { def apply(v: Any) = new LetResult(v, false) }
 
-  class LetResult(var payload: Any, var hasBeenEval: Boolean) {
+  class LetResult(var payload: Any, var hasBeenEval: Boolean, var check: Any => Boolean = _ => true) {
 
     def apply(): Any = {
 
       if (!hasBeenEval) {
         val (capEnv, original) = payload.asInstanceOf[(Dict, Any)]
         payload = eval(capEnv, original)
+
+        require(check(payload))
+
         hasBeenEval = true
       }
       payload
     }
+
+    def setCheck(c: Any => Boolean) = {
+      check = c
+    }
+
     def setEnv(e: Dict) = {
       payload = (e -> payload)
     }

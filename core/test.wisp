@@ -13,25 +13,50 @@ assert
 assert
 	not (fails 3)
 
-"Quick test that the syntax.wisp stuff works"
 
-; this is a comment
+let binding (vect 3 4 5)
+assert
+	num-eq
+		nth binding 0
+		, 3
+
+let (binding-a binding-b) (vect 4 5)
 
 assert
-	== 3
-		, 3
+	num-eq binding-a 4
+
+assert
+	num-eq binding-b 5
+
+assert
+	fails
+		do
+			let () 444
+
+assert
+	fails
+		do
+			let (foo &) (vect 1 2)
+
+; assert
+	do
+
+let (test-a (test-q test-d) test-c & test-rest) (vect 1 (vect 7 7) 2 3 4 5 6 7)
+
+
+; this is a comment
 
 
 "Time to test foldLeft"
 
 let l
-	list 1 (+ 1 1) 3 4
+	vect 1 (num-add 1 1) 3 4
 
 let l2
-	fold-left l 0 +
+	fold-left l 0 num-add
 
 assert
-	== l2 10
+	num-eq l2 10
 
 
 let add
@@ -39,7 +64,7 @@ let add
 		do
 			let f (eval e (nth a 0))
 			let s (eval e (nth a 1))
-			+ f s
+			num-add f s
 
 let l3
 	fold-left l 0
@@ -47,13 +72,13 @@ let l3
 			do
 				let f (eval e (nth a 0))
 				let s (eval e (nth a 1))
-				+ f s
+				num-add f s
 
 assert
-	== l3 10
+	num-eq l3 10
 
 assert
-	== 125
+	num-eq 125
 		ack 3 4
 
 "...and ackermann function"
