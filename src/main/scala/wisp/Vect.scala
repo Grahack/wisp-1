@@ -5,11 +5,7 @@ object +: {
 }
 
 object Vect {
-
-  def apply(values: Any*) = new Vect(Vector(values: _*))
-  
-  def apply(value: List[Any]) = new Vect(Vector(value: _*))
-  
+  def apply(values: Any*) = new Vect(Vector(values: _*))  
   def unapplySeq(x: Vect) = Vector.unapplySeq(x.data) //.map(new Vect(_))
 }
 

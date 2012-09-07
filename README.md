@@ -29,6 +29,23 @@ Running
 
 Either run the `./wisp` script, or if you prefer there is a self-contained jar at `target/wisp.jar`
 
+```
+usage: wisp [-i | -w] file-to-interpret.wisp
+
+Valid options are:
+         
+  -i        Interactive. After running the program, drop into
+            an interactive repl session
+          
+          OR
+
+  -w        Watch. After running the program, watch the file
+            and its transitive dependencies for any changes. If
+            any files change, rerun the program
+```
+
+Both options are extremely useful for wisp development
+
 
 Documentation
 ====

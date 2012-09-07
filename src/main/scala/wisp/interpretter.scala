@@ -8,7 +8,7 @@ object Interpretter {
   import java.nio.file.Path
   import java.nio.file.Paths
 
-  def apply(path: Path): (Any, Dict) = {
+  def apply(path: Path): (Any, Dict, IndexedSeq[Path]) = {
 
     val forms = Reader(path)
 
@@ -17,27 +17,28 @@ object Interpretter {
       case _ => false
     })
 
-    val env = if (imports.isEmpty) startingEnv else {
+    val (env, paths) =
+      imports.foldLeft((startingEnv, IndexedSeq(path)))(
+        (ps, nextImport) =>
+          nextImport match {
+            case 'import +: (importFilePath: String) +: Vect() => {
+              // TODO: avoid double-loading a file
 
-      imports.foldLeft(Dict())((e, nextImport) => nextImport match {
-        case 'import +: (importFilePath: String) +: Vect() => {
-          // TODO: avoid double-loading a file
-          e merge Interpretter(path.resolveSibling(importFilePath))._2
-        }
-        case _ => sys.error("Could not understand import")
-      })
+              val (_, pe, pp) = Interpretter(path.resolveSibling(importFilePath))
 
-    }
+              ((ps._1 merge pe) -> (ps._2 ++ pp))
+            }
+            case _ => sys.error("Could not understand import")
+          })
 
     val (statements, newEnv) = buildDoBlock(env, rest)
 
-    (statements.foldLeft(Vect(): Any)((a, b) => eval(newEnv, b)) -> newEnv)
+    val res = statements.foldLeft(Vect(): Any)((a, b) => eval(newEnv, b))
+
+    (res, newEnv, paths)
   }
 
-  object WFunc extends Enumeration {
-    type WFunc = Value
-    val TypeOf, TypeEq, Str, Nth, Drop, Cons, VecFunc, Trace, Fails, Assert, Length, DictSize, DictGet, FoldLeft, DictInsert, DictRemove, DictContains, Not, And, Or, LessThan, LessThanOrEqual, NumEq, GreaterThan, GreaterThanOrEqual, Eval, Add, Sub, If, Quote, Vau, DoBlock, NumToString = Value
-  }
+  // object FuncNumber extends
 
   object WTypes extends Enumeration {
     type WType = Value
@@ -45,59 +46,6 @@ object Interpretter {
   }
 
   import WTypes._
-  import WFunc._
-
-  private def startingEnv = Dict() +
-    ('true -> true) +
-    ('false -> false) +
-    // Types
-    ('Num -> TypeNum) +
-    ('Str -> TypeStr) +
-    ('Bool -> TypeBool) +
-    ('Vect -> TypeVect) +
-    ('Sym -> TypeSym) +
-    ('Dict -> TypeDict) +
-    ('Type -> TypeType) +
-    (Symbol("type-of") -> TypeOf) +
-    (Symbol("type-eq") -> TypeEq) +
-    // Some pretty primitive stuff
-    ('do -> DoBlock) +
-    ('eval -> Eval) +
-    ('if -> If) +
-    ('vau -> Vau) +
-    (Symbol("'") -> Quote) +
-    // some num stuff
-    (Symbol("num-add") -> Add) +
-    (Symbol("num-sub") -> Sub) +
-    (Symbol("num-lt") -> LessThan) +
-    (Symbol("num-lte") -> LessThanOrEqual) +
-    (Symbol("num-eq") -> NumEq) +
-    (Symbol("num-gt") -> GreaterThan) +
-    (Symbol("num-gte") -> GreaterThanOrEqual) +
-    (Symbol("num-to-str") -> NumToString) +
-    // utility like
-    ('str -> Str) +
-    ('assert -> Assert) +
-    // vect functions
-    ('nth -> Nth) +
-    ('drop -> Drop) +
-    ('length -> Length) +
-    ('cons -> Cons) +
-    ('vect -> VecFunc) +
-    (Symbol("fold-left") -> FoldLeft) +
-    // Dict functions
-    (Symbol("dict-insert") -> DictInsert) +
-    (Symbol("dict-size") -> DictSize) +
-    (Symbol("dict-contains") -> DictContains) +
-    (Symbol("dict-get") -> DictGet) +
-    (Symbol("dict-remove") -> DictRemove) +
-    // boolean
-    ('not -> Not) +
-    ('and -> And) +
-    ('or -> Or) +
-    // debug
-    ('trace -> Trace) +
-    ('fails -> Fails)
 
   def eval(e: Dict, form: Any): Any = {
     form match {
@@ -114,12 +62,13 @@ object Interpretter {
 
         def evaledArgs() = rawArgs.map(eval(e, _))
 
-        eval(e, f) match {
+        val func = eval(e, f)
+
+        func.asInstanceOf[WFunc] match {
           case VauRun(capEnv, envS, argS, capCode) => eval(capEnv + (envS -> e) + (argS -> rawArgs), capCode)
-          case Eval => evaledArgs() match {
-            case Vect(env: Dict, v) => eval(env, v)
-          }
-          case DoBlock => {
+
+          // primitive stuff
+          case Do => {
             val (statements, newEnv) = buildDoBlock(e, rawArgs)
             require(statements.nonEmpty)
             statements.init.foreach {
@@ -128,14 +77,8 @@ object Interpretter {
             // and for a nice tail call
             eval(newEnv, statements.last)
           }
-          case NumEq => evaledArgs() match {
-            case Vect(a: Int, b: Int) => a == b
-          }
-          case Add => evaledArgs() match {
-            case Vect(a: Int, b: Int) => a + b
-          }
-          case Sub => evaledArgs() match {
-            case Vect(a: Int, b: Int) => a - b
+          case Eval => evaledArgs() match {
+            case Vect(env: Dict, v) => eval(env, v)
           }
           case If => rawArgs match {
             case Vect(cond, trueCase, falseCase) => if (eval(e, cond).asInstanceOf[Boolean]) eval(e, trueCase) else eval(e, falseCase)
@@ -147,24 +90,15 @@ object Interpretter {
             case Vect(envS: Symbol, argS: Symbol, code) =>
               require(!e.contains(envS), "Can't use symbol " + envS + " for binding an environment, as it already exists")
               require(!e.contains(argS), "Can't use symbol " + argS + " for binding an argument list, as it already exists")
-              require(envS != argS)
+              require(envS != argS, "Can't use the same symbol for binding the environment and argument")
               VauRun(e, envS, argS, code)
           }
-          case LessThan => evaledArgs() match {
-            case Vect(a: Int, b: Int) => a < b
+
+          // type stuff
+          case TypeEq => evaledArgs() match {
+            case Vect(a: WType, b: WType) => a == b
           }
-          case LessThanOrEqual => evaledArgs() match {
-            case Vect(a: Int, b: Int) => a <= b
-          }
-          case GreaterThan => evaledArgs() match {
-            case Vect(a: Int, b: Int) => a > b
-          }
-          case GreaterThanOrEqual => evaledArgs() match {
-            case Vect(a: Int, b: Int) => a >= b
-          }
-          case NumToString => evaledArgs() match {
-            case Vect(a: Int) => a.toString()
-          }
+
           case TypeOf => evaledArgs() match {
             case Vect(a) => a match {
               case _: Boolean => TypeBool
@@ -176,22 +110,135 @@ object Interpretter {
               case _: WType => TypeType
             }
           }
-          case Str => {
-            val sb = new StringBuilder()
-            rawArgs.foreach(x => sb.append(eval(e, x)))
-            sb.result()
+
+          // number stuff
+          case NumAdd => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a + b
           }
-          case Nth => evaledArgs() match {
-            case Vect(value: Vect, index: Int) => value(index)
+          case NumDiv => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a / b
           }
-          case Drop => evaledArgs() match {
+          case NumEq => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a == b
+          }
+          case NumGreaterThan => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a > b
+          }
+          case NumGreaterThanOrEqual => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a >= b
+          }
+          case NumLessThan => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a < b
+          }
+          case NumLessThanOrEqual => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a <= b
+          }
+          case NumMult => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a * b
+          }
+          case NumSub => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a - b
+          }
+
+          case NumToString => evaledArgs() match {
+            case Vect(a: Int) => a.toString()
+          }
+
+          // string stuff
+
+          case StrConcat => evaledArgs() match {
+            case Vect(a: String, b: String) => a + b
+          }
+          case StrEq => evaledArgs() match {
+            case Vect(a: String, b: String) => a == b
+          }
+          case StrLen => evaledArgs() match {
+            case Vect(a: String) => a.length
+          }
+          case StrToVect => evaledArgs() match {
+            case Vect(a: String) => Vect(a.toCharArray().map(x => x.toString): _*)
+          }
+
+          // vector stuff
+
+          case VectAppend => evaledArgs() match {
+            case Vect(vect: Vect, v) => vect.append(v)
+          }
+          case VectCons => evaledArgs() match {
+            case Vect(vect: Vect, v) => vect.cons(v)
+          }
+          case VectDrop => evaledArgs() match {
             case Vect(value: Vect, amount: Int) => value.drop(amount)
           }
-          case Cons => evaledArgs() match {
-            case Vect(h, tail: Vect) => tail.cons(h)
+          case VectFoldLeft => rawArgs match {
+            case Vect(v, start, f) =>
+              val vec = eval(e, v).asInstanceOf[Vect]
+              // Note: note evaling 'start' as we're threading it through
+              val func = eval(e, f)
+              // The logic here is super tricky, we're wrapping it in a Quote so it doesn't mess up fexp
+              // and then eval'ing it at the end, to remove the quote
+              eval(e, vec.foldLeft(start)((a, b) => Vect(Quote, eval(e, Vect(func, a, b)))))
           }
-          case VecFunc => evaledArgs()
-          case Trace => println(evaledArgs().mkString)
+          case VectMake => evaledArgs()
+
+          case VectNth => evaledArgs() match {
+            case Vect(vect: Vect, index: Int) => vect(index)
+          }
+
+          case VectReduce => evaledArgs() match {
+            case Vect(vect: Vect, func) => {
+              eval(e, vect.reduce((a, b) => Vect(Quote, eval(e, Vect(func, a, b)))))
+            }
+          }
+
+          // dictionary stuff
+          case DictContains => evaledArgs() match {
+            case Vect(lu: Dict, k) => lu.contains(k)
+          }
+
+          case DictGet => evaledArgs() match {
+            case Vect(dict: Dict, k) => dict(k)
+          }
+
+          case DictInsert => evaledArgs() match {
+            case Vect(dict: Dict, k, v) => dict + (k -> v)
+          }
+
+          case DictRemove => evaledArgs() match {
+            case Vect(dict: Dict, k) => dict - k
+          }
+
+          case DictSize => evaledArgs() match {
+            case Vect(dict: Dict) => dict.size
+          }
+
+          case DictToVect => evaledArgs() match {
+            case Vect(a: Dict) => a.data.foldLeft(Vect()) { (p, n) => p.append(n) }
+          }
+
+          // boolean stuff 
+
+          case BoolNot => evaledArgs() match {
+            case Vect(arg: Boolean) => !arg
+          }
+          case BoolAnd => {
+            require(rawArgs.length >= 2)
+            rawArgs.data.forall(eval(e, _).asInstanceOf[Boolean] == true)
+          }
+          case BoolOr => {
+            require(rawArgs.length >= 2)
+            !rawArgs.data.forall(eval(e, _).asInstanceOf[Boolean] == false)
+          }
+          case BoolEq => evaledArgs match {
+            case Vect(a: Boolean, b: Boolean) => a == b
+          }
+
+          // debug stuff
+
+          case Error => evaledArgs() match {
+            case Vect() => sys.error("Code called an error")
+            case Vect(msg: String) => sys.error("Code called an errror with msg: " + msg)
+          }
           case Fails => rawArgs match {
             case Vect(arg) => try {
               eval(e, arg)
@@ -200,58 +247,15 @@ object Interpretter {
               case _ => true
             }
           }
-          case Assert => evaledArgs() match {
-            case Vect(res: Boolean) => require(res, "Code assertion failed!")
-            case Vect(res: Boolean, msg: String) => require(res, "Code assertion failed, with errror: " + msg)
-          }
-          case Length => evaledArgs() match {
+          case Trace => println(evaledArgs().mkString)
+          case VectLength => evaledArgs() match {
             case Vect(vec: Vect) => vec.length
-          }
-          case DictSize => evaledArgs() match {
-            case Vect(dict: Dict) => dict.size
-          }
-          case DictGet => evaledArgs() match {
-            case Vect(dict: Dict, k) => dict(k)
-          }
-          case FoldLeft => rawArgs match {
-            case Vect(v, start, f) =>
-              val vec = eval(e, v).asInstanceOf[Vect]
-              // Note: note evaling 'start' as we're threading it through
-              val func = eval(e, f)
-              eval(e, vec.foldLeft(start)((a, b) => Vect(Quote, eval(e, Vect(func, a, b)))))
-          }
-          case DictInsert => evaledArgs() match {
-            case Vect(dict: Dict, k, v) => dict + (k -> v)
-          }
-          case DictRemove => evaledArgs() match {
-            case Vect(dict: Dict, k) => dict - k
-          }
-          case DictContains => evaledArgs() match {
-            case Vect(lu: Dict, k) => lu.contains(k)
-          }
-          case Not => evaledArgs() match {
-            case Vect(arg: Boolean) => !arg
-          }
-          case And => {
-            require(rawArgs.length >= 2)
-            rawArgs.data.forall(eval(e, _).asInstanceOf[Boolean] == true)
-          }
-          case Or => {
-            require(rawArgs.length >= 2)
-            !rawArgs.data.forall(eval(e, _).asInstanceOf[Boolean] == false)
-          }
-          case TypeEq => evaledArgs() match {
-            case Vect(a: WType, b: WType) => a == b
           }
 
         }
       }
       case x => x
     }
-  }
-
-  case class VauRun(capEnv: Dict, envS: Symbol, argS: Symbol, capCode: Any) {
-    override def toString = "$vau$" + this
   }
 
   def foldReduce(op: (Int, Int) => Boolean, e: Dict, args: Vect): Boolean = {
@@ -284,7 +288,7 @@ object Interpretter {
           val (single, multi) = pattern.span(_ != Symbol("&"))
 
           val built = (None -> v) +: single.data.zipWithIndex.flatMap {
-            case (s, i) => letBuilder(s, LetResult(Vect(Nth, v, i)))
+            case (s, i) => letBuilder(s, LetResult(Vect(VectNth, v, i)))
           }
 
           if (multi.nonEmpty) {
@@ -293,7 +297,7 @@ object Interpretter {
 
             v.setCheck(_.asInstanceOf[Vect].length >= single.length)
 
-            (Some(multi(1).asInstanceOf[Symbol]) -> LetResult(Vect(Drop, v, single.length))) +: built
+            (Some(multi(1).asInstanceOf[Symbol]) -> LetResult(Vect(VectDrop, v, single.length))) +: built
 
           } else {
             v.setCheck(_.asInstanceOf[Vect].length == single.length)
@@ -366,5 +370,131 @@ object Interpretter {
       payload = (e -> payload)
     }
   }
+
+  sealed abstract class WFunc
+
+  // primitive functions
+  object Do extends WFunc
+  object Eval extends WFunc
+  object If extends WFunc
+  object Quote extends WFunc
+  object Vau extends WFunc
+
+  // type stuff
+  object TypeEq extends WFunc
+  object TypeOf extends WFunc
+
+  // number stuff
+  object NumAdd extends WFunc
+  object NumDiv extends WFunc
+
+  object NumGreaterThan extends WFunc
+  object NumGreaterThanOrEqual extends WFunc
+  object NumEq extends WFunc
+  object NumLessThan extends WFunc
+  object NumLessThanOrEqual extends WFunc
+  object NumMult extends WFunc
+  object NumSub extends WFunc
+  object NumToString extends WFunc
+
+  // string stuff
+  object StrConcat extends WFunc
+  object StrEq extends WFunc
+  object StrLen extends WFunc
+  object StrToVect extends WFunc
+
+  // Vector Stuff
+  object VectAppend extends WFunc
+  object VectCons extends WFunc
+  object VectDrop extends WFunc
+  object VectFoldLeft extends WFunc // <-- todo die
+  object VectLength extends WFunc
+  object VectMake extends WFunc
+  object VectNth extends WFunc
+  object VectReduce extends WFunc // <-- this is important, as it will be used for compiler optimizations
+
+  // dict stuff
+  object DictContains extends WFunc
+  object DictGet extends WFunc
+  object DictInsert extends WFunc
+  object DictRemove extends WFunc
+  object DictSize extends WFunc
+  object DictToVect extends WFunc
+
+  // boolean stuff
+  object BoolNot extends WFunc
+  object BoolAnd extends WFunc
+  object BoolOr extends WFunc
+  object BoolEq extends WFunc
+
+  // debug stuff
+  object Trace extends WFunc
+  object Fails extends WFunc
+  object Error extends WFunc
+
+  case class VauRun(capEnv: Dict, envS: Symbol, argS: Symbol, capCode: Any) extends WFunc {
+    override def toString = "$vau$" + this
+  }
+
+  private def startingEnv = Dict() +
+    // Some pretty primitive stuff
+    (Symbol("#do") -> Do) +
+    (Symbol("#eval") -> Eval) +
+    (Symbol("#if") -> If) +
+    (Symbol("#quote") -> Quote) +
+    (Symbol("#vau") -> Vau) +
+    // Types
+    (Symbol("#Num") -> TypeNum) +
+    (Symbol("#Str") -> TypeStr) +
+    (Symbol("#Bool") -> TypeBool) +
+    (Symbol("#Vect") -> TypeVect) +
+    (Symbol("#Sym") -> TypeSym) +
+    (Symbol("#Dict") -> TypeDict) +
+    (Symbol("#Type") -> TypeType) +
+    (Symbol("#type-eq") -> TypeEq) +
+    (Symbol("#type-of") -> TypeOf) +
+    // some num stuff
+    (Symbol("#num-add") -> NumAdd) +
+    (Symbol("#num-div") -> NumDiv) +
+    (Symbol("#num-eq") -> NumEq) +
+    (Symbol("#num-gt") -> NumGreaterThan) +
+    (Symbol("#num-gte") -> NumGreaterThanOrEqual) +
+    (Symbol("#num-lt") -> NumLessThan) +
+    (Symbol("#num-lte") -> NumLessThanOrEqual) +
+    (Symbol("#num-sub") -> NumSub) +
+    (Symbol("#num-to-str") -> NumToString) +
+    // string stuff
+    (Symbol("#str-concat") -> StrConcat) +
+    (Symbol("#str-eq") -> StrEq) +
+    (Symbol("#str-len") -> StrLen) +
+    (Symbol("#str-to-vect") -> StrToVect) +
+    // vect functions
+    (Symbol("#vect-append") -> VectAppend) +
+    (Symbol("#vect-cons") -> VectCons) +
+    (Symbol("#vect-drop") -> VectDrop) +
+    (Symbol("#vect-fold-left") -> VectFoldLeft) +
+    (Symbol("#vect-length") -> VectLength) +
+    (Symbol("#vect-make") -> VectMake) +
+    (Symbol("#vect-nth") -> VectNth) +
+    (Symbol("#vect-reduce") -> VectReduce) +
+    // Dict functions
+    (Symbol("#dict-contains") -> DictContains) +
+    (Symbol("#dict-empty") -> Dict()) +
+    (Symbol("#dict-get") -> DictGet) +
+    (Symbol("#dict-insert") -> DictInsert) +
+    (Symbol("#dict-remove") -> DictRemove) +
+    (Symbol("#dict-size") -> DictSize) +
+    (Symbol("#dict-to-vect") -> DictToVect) +
+    // boolean
+    (Symbol("#bool-and") -> BoolAnd) +
+    (Symbol("#bool-eq") -> BoolEq) +
+    (Symbol("#bool-false") -> false) +
+    (Symbol("#bool-not") -> BoolNot) +
+    (Symbol("#bool-or") -> BoolOr) +
+    (Symbol("#bool-true") -> true) +
+    // debug
+    (Symbol("#error") -> Error) +
+    (Symbol("#fails") -> Fails) +
+    (Symbol("#trace") -> Trace)
 
 }

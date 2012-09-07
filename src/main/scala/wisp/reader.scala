@@ -38,9 +38,9 @@ object Reader extends Parsers {
       t
   }
       
-  private def vrep(p: => Parser[Any]): Parser[Vect] = rep(p) ^^ (Vect(_))
-  private def vrepsep(p: => Parser[Any], q: => Parser[Any]): Parser[Vect] = repsep(p, q) ^^ (Vect(_))
-  private def vrep1sep(p: => Parser[Any], q: => Parser[Any]): Parser[Vect] = rep1sep(p, q) ^^ (Vect(_))
+  private def vrep(p: => Parser[Any]): Parser[Vect] = rep(p) ^^ (Vect(_: _*))
+  private def vrepsep(p: => Parser[Any], q: => Parser[Any]): Parser[Vect] = repsep(p, q) ^^ (Vect(_: _*))
+  private def vrep1sep(p: => Parser[Any], q: => Parser[Any]): Parser[Vect] = rep1sep(p, q) ^^ (Vect(_: _*))
 
   private def atomParser = vectParser | intParser | quotedStringParser | symbolParser
 
