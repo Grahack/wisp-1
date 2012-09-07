@@ -29,7 +29,9 @@ object Interpretter {
 
     }
 
-    DoBlockRun(env, rest)
+    val (statements, newEnv) = buildDoBlock(env, rest)
+
+    (statements.foldLeft(Vect(): Any)((a, b) => eval(newEnv, b)) -> newEnv)
   }
 
   object WFunc extends Enumeration {
@@ -117,7 +119,15 @@ object Interpretter {
           case Eval => evaledArgs() match {
             case Vect(env: Dict, v) => eval(env, v)
           }
-          case DoBlock => DoBlockRun(e, rawArgs)._1
+          case DoBlock => {
+            val (statements, newEnv) = buildDoBlock(e, rawArgs)
+            require(statements.nonEmpty)
+            statements.init.foreach {
+              eval(newEnv, _)
+            }
+            // and for a nice tail call
+            eval(newEnv, statements.last)
+          }
           case NumEq => evaledArgs() match {
             case Vect(a: Int, b: Int) => a == b
           }
@@ -262,8 +272,7 @@ object Interpretter {
 
   def strict = false
 
-  def DoBlockRun(e: Dict, forms: Vect): (Any, Dict) = {
-
+  def buildDoBlock(e: Dict, forms: Vect): (IndexedSeq[Any], Dict) = {
     def letBuilder(form: Any, v: LetResult): Iterable[(Option[Symbol], LetResult)] = {
 
       form match {
@@ -329,7 +338,7 @@ object Interpretter {
 
     // now that we done all our static environment stuff, we can go through and evaluate it all
 
-    (rest.foldLeft(Vect(): Any)((a, b) => eval(newEnv, b)), newEnv)
+    (rest, newEnv)
   }
 
   object LetResult { def apply(v: Any) = new LetResult(v, false) }
