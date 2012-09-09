@@ -57,14 +57,13 @@ Valid options are:
         println("Took: " + time + "ms")
 
         watching = files
-      } catch { case x => println("Caught errror: " + x) }
+      } catch { case x: Throwable => println("Caught errror: " + x) }
 
       require(watching.nonEmpty)
 
       print("Waiting on file changes...")
       blockOn(watching)
       println("\n")
-
     }
 
   }

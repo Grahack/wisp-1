@@ -21,7 +21,7 @@ class Vect(val data: Vector[Any]) {
   def cons(v: Any): Any = new Vect(v +: data)
   def append(v: Any) = new Vect(data :+ v)
 
-  def drop(n: Int) = new Vect(data.drop(n))
+  def slice(from: Int, until: Int) = new Vect(data.slice(from, until))
   
   def reverse = new Vect(data.reverse)
 

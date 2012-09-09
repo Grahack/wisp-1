@@ -121,6 +121,9 @@ object Interpretter {
           case NumEq => evaledArgs() match {
             case Vect(a: Int, b: Int) => a == b
           }
+          case NumNeq => evaledArgs() match {
+            case Vect(a: Int, b: Int) => a != b
+          }
           case NumGreaterThan => evaledArgs() match {
             case Vect(a: Int, b: Int) => a > b
           }
@@ -145,41 +148,50 @@ object Interpretter {
           }
 
           // string stuff
-
+          case StrCharAt => evaledArgs() match {
+            case Vect(str: String, at: Int) => str.charAt(at).toString
+          }
           case StrConcat => evaledArgs() match {
             case Vect(a: String, b: String) => a + b
           }
           case StrEq => evaledArgs() match {
             case Vect(a: String, b: String) => a == b
           }
-          case StrLen => evaledArgs() match {
-            case Vect(a: String) => a.length
+          case StrIndexOf => evaledArgs() match {
+            case Vect(str: String, search: String, startIndex: Int) => str.indexOf(search, startIndex)
+          }
+          case StrLastIndexOf => evaledArgs() match {
+            case Vect(str: String, search: String, lastIndex: Int) => str.lastIndexOf(search, lastIndex)
+          }
+          case StrLength => evaledArgs() match {
+            case Vect(str: String) => str.length
+          }
+          case StrSlice => evaledArgs() match {
+            case Vect(str: String, from: Int, until: Int) => str.slice(from, until)
+          }
+          case StrSplit => evaledArgs() match {
+            case Vect(str: String, using: String) => Vect(str.split(using): _*) // TODO: careful, is this using regex?
           }
           case StrToVect => evaledArgs() match {
-            case Vect(a: String) => Vect(a.toCharArray().map(x => x.toString): _*)
+            case Vect(str: String) => Vect(str.toCharArray().map(x => x.toString): _*)
+          }
+
+          // symbol stuff
+          case SymToString => evaledArgs() match {
+            case Vect(sym: Symbol) => sym.name
           }
 
           // vector stuff
-
           case VectAppend => evaledArgs() match {
             case Vect(vect: Vect, v) => vect.append(v)
+            case x => sys.error ("args were: " + x)
           }
           case VectCons => evaledArgs() match {
             case Vect(vect: Vect, v) => vect.cons(v)
           }
-          case VectDrop => evaledArgs() match {
-            case Vect(value: Vect, amount: Int) => value.drop(amount)
+          case VectSlice => evaledArgs() match {
+            case Vect(vect: Vect, from: Int, until: Int) => vect.slice(from, until)
           }
-          case VectFoldLeft => rawArgs match {
-            case Vect(v, start, f) =>
-              val vec = eval(e, v).asInstanceOf[Vect]
-              // Note: note evaling 'start' as we're threading it through
-              val func = eval(e, f)
-              // The logic here is super tricky, we're wrapping it in a Quote so it doesn't mess up fexp
-              // and then eval'ing it at the end, to remove the quote
-              eval(e, vec.foldLeft(start)((a, b) => Vect(Quote, eval(e, Vect(func, a, b)))))
-          }
-          case VectMake => evaledArgs()
 
           case VectNth => evaledArgs() match {
             case Vect(vect: Vect, index: Int) => vect(index)
@@ -244,7 +256,7 @@ object Interpretter {
               eval(e, arg)
               false
             } catch {
-              case _ => true
+              case _: Throwable => true
             }
           }
           case Trace => println(evaledArgs().mkString)
@@ -295,12 +307,24 @@ object Interpretter {
             assert(multi(0) == Symbol("&"))
             require(multi.length == 2)
 
-            v.setCheck(_.asInstanceOf[Vect].length >= single.length)
+            v.setPostFunction {
+              r =>
+                assert(r.isInstanceOf[Vect])
+                assert(r.asInstanceOf[Vect].length > single.length)
+                r
+            }
+            
+            val brokenResult = LetResult(v)
+            brokenResult.setPostFunction {
+              r =>
+                val v = r.asInstanceOf[Vect]
+                v.slice(single.length, v.length)
+            }
 
-            (Some(multi(1).asInstanceOf[Symbol]) -> LetResult(Vect(VectDrop, v, single.length))) +: built
+            (Some(multi(1).asInstanceOf[Symbol]) -> brokenResult) +: built
 
           } else {
-            v.setCheck(_.asInstanceOf[Vect].length == single.length)
+            v.setPostFunction { r => r.asInstanceOf[Vect].length == single.length ; r }
             built
           }
 
@@ -347,28 +371,28 @@ object Interpretter {
 
   object LetResult { def apply(v: Any) = new LetResult(v, false) }
 
-  class LetResult(var payload: Any, var hasBeenEval: Boolean, var check: Any => Boolean = _ => true) {
+  class LetResult(var payload: Any, var hasBeenEval: Boolean, var post: Any => Any = identity _) {
 
     def apply(): Any = {
 
       if (!hasBeenEval) {
         val (capEnv, original) = payload.asInstanceOf[(Dict, Any)]
-        payload = eval(capEnv, original)
-
-        require(check(payload))
+        payload = post(eval(capEnv, original))
 
         hasBeenEval = true
       }
       payload
     }
 
-    def setCheck(c: Any => Boolean) = {
-      check = c
+    def setPostFunction(c: Any => Any) = {
+      post = c
     }
 
     def setEnv(e: Dict) = {
       payload = (e -> payload)
     }
+
+    override def toString = "{LetResult}"
   }
 
   sealed abstract class WFunc
@@ -391,6 +415,7 @@ object Interpretter {
   object NumGreaterThan extends WFunc
   object NumGreaterThanOrEqual extends WFunc
   object NumEq extends WFunc
+  object NumNeq extends WFunc
   object NumLessThan extends WFunc
   object NumLessThanOrEqual extends WFunc
   object NumMult extends WFunc
@@ -398,20 +423,26 @@ object Interpretter {
   object NumToString extends WFunc
 
   // string stuff
+  object StrCharAt extends WFunc
   object StrConcat extends WFunc
   object StrEq extends WFunc
-  object StrLen extends WFunc
+  object StrIndexOf extends WFunc
+  object StrLastIndexOf extends WFunc
+  object StrLength extends WFunc
+  object StrSlice extends WFunc
+  object StrSplit extends WFunc
   object StrToVect extends WFunc
+
+  // sym stuff
+  object SymToString extends WFunc
 
   // Vector Stuff
   object VectAppend extends WFunc
   object VectCons extends WFunc
-  object VectDrop extends WFunc
-  object VectFoldLeft extends WFunc // <-- todo die
   object VectLength extends WFunc
-  object VectMake extends WFunc
   object VectNth extends WFunc
   object VectReduce extends WFunc // <-- this is important, as it will be used for compiler optimizations
+  object VectSlice extends WFunc
 
   // dict stuff
   object DictContains extends WFunc
@@ -433,7 +464,7 @@ object Interpretter {
   object Error extends WFunc
 
   case class VauRun(capEnv: Dict, envS: Symbol, argS: Symbol, capCode: Any) extends WFunc {
-    override def toString = "$vau$" + this
+    override def toString = "$vau$"
   }
 
   private def startingEnv = Dict() +
@@ -461,22 +492,28 @@ object Interpretter {
     (Symbol("#num-gte") -> NumGreaterThanOrEqual) +
     (Symbol("#num-lt") -> NumLessThan) +
     (Symbol("#num-lte") -> NumLessThanOrEqual) +
+    (Symbol("#num-neq") -> NumNeq) +
     (Symbol("#num-sub") -> NumSub) +
     (Symbol("#num-to-str") -> NumToString) +
     // string stuff
+    (Symbol("#str-chat-at") -> StrCharAt) +
     (Symbol("#str-concat") -> StrConcat) +
     (Symbol("#str-eq") -> StrEq) +
-    (Symbol("#str-len") -> StrLen) +
+    (Symbol("#str-index-of") -> StrIndexOf) +
+    (Symbol("#str-last-index-of") -> StrLastIndexOf) +
+    (Symbol("#str-length") -> StrLength) +
+    (Symbol("#str-slice") -> StrSlice) +
+    (Symbol("#str-split") -> StrSplit) +
     (Symbol("#str-to-vect") -> StrToVect) +
+    // sym stuff
+    (Symbol("#sym-to-string") -> SymToString) +
     // vect functions
     (Symbol("#vect-append") -> VectAppend) +
     (Symbol("#vect-cons") -> VectCons) +
-    (Symbol("#vect-drop") -> VectDrop) +
-    (Symbol("#vect-fold-left") -> VectFoldLeft) +
     (Symbol("#vect-length") -> VectLength) +
-    (Symbol("#vect-make") -> VectMake) +
     (Symbol("#vect-nth") -> VectNth) +
     (Symbol("#vect-reduce") -> VectReduce) +
+    (Symbol("#vect-slice") -> VectSlice) +
     // Dict functions
     (Symbol("#dict-contains") -> DictContains) +
     (Symbol("#dict-empty") -> Dict()) +
