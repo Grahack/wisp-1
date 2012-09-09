@@ -6,17 +6,26 @@ Wisp is a whitespace lisp. It is designed to be extremely powerful and flexible,
   * Significant whitespace
   * [First-class combinators](https://secure.wikimedia.org/wikipedia/en/wiki/Fexpr)
   * Static Scoping with forward references (like you'd expect from a modern language)
-  * Very functional
+  * Purely functional (or close to it)
+  * Compile to efficient javascript
+  * Based on persistent vectors and maps (not linked-lists like most lisps)
 
 Status
 ======
-A toy, and I won't claim otherwise until it's self-hosting.
+
+  * Language fundamentals **Done**
+  * Simple interpretter **Done**
+  * Standard library **In progress**
+  * Self-hosting **TODO**
+  * Javascript compiler **TODO**
+  * Documentation **TODO**
+  * Static analysis **TODO**
 
 
 Building
 ========
 
-Wisp is currently written in Scala, which unfortunately is on the JVM. Eventually wisp will be hosted ontop of llvm and/or javascript, but in the mean time you will need `sbt` (scala build tool) to build, which will also handle getting the dependencies (inclusive of scala).
+Wisp is currently written in Scala, which unfortunately is on the JVM. Eventually wisp will be hosted ontop of javascript, but in the mean time you will need `sbt` (scala build tool) to build, which will also handle getting the dependencies (inclusive of scala).
 
   * [Download sbt](http://www.scala-sbt.org/download.html) (don't worry, its quite painless)
   * `git clone https://github.com/espringe/wisp.git`
