@@ -37,14 +37,14 @@ object Reader extends Parsers {
     else
       t
   }
-      
+
   private def vrep(p: => Parser[Any]): Parser[Vect] = rep(p) ^^ (Vect(_: _*))
   private def vrepsep(p: => Parser[Any], q: => Parser[Any]): Parser[Vect] = repsep(p, q) ^^ (Vect(_: _*))
   private def vrep1sep(p: => Parser[Any], q: => Parser[Any]): Parser[Vect] = rep1sep(p, q) ^^ (Vect(_: _*))
 
   private def atomParser = vectParser | intParser | quotedStringParser | symbolParser
 
-  private def vectParser: Parser[Vect] = '(' ~> rep(' ') ~> vrepsep(atomParser, rep(' '))  ~< rep(' ') ~< ')'
+  private def vectParser: Parser[Vect] = '(' ~> rep(' ') ~> vrepsep(atomParser, rep(' ')) ~< rep(' ') ~< ')'
 
   // TODO: allow arbitrary base
   private def intParser = rep1(digitParser) ^^ (x => numberListToNumber(x, base = 10))
@@ -52,14 +52,12 @@ object Reader extends Parsers {
   private def digitParser: Parser[Int] =
     acceptIf(c => c.isDigit)(c => "Unexpected '" + c + "' when looking for a digit") ^^ (q => q.asDigit)
 
-  // TODO: allow symbol escaping
   private def symbolParser = rep1(
     acceptIf(c =>
       !c.isWhitespace &&
         !c.isControl &&
         c != ')' &&
         c != '(' &&
-        c != '\\' &&
         c != '"')(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ charListToSymbol
 
   private def quotedStringParser = '"' ~> rep(insideQuoteParser) ~< '"' ^^ charListToString
@@ -78,6 +76,5 @@ object Reader extends Parsers {
   // get around annoying precedent rule of <~
   implicit private def toUnannoying[T](p: Parser[T]): UnannoyingParser[T] = new UnannoyingParser(p)
   private class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
-
 
 }
