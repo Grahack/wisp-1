@@ -24,6 +24,14 @@ let ,
 			assert (#num-eq (#vect-length a) 1)
 			#eval e (#vect-nth a 0)
 
+let head
+	#vau e a
+		do
+			assert (#num-eq (#vect-length a) 1)
+			let vec (eval e (#vect-nth a 0))
+			assert (#num-gte (#vect-length vec) 0)
+			#vect-nth vec 0
+
 let tail
 	#vau e a
 		do
@@ -43,34 +51,16 @@ let drop
 			assert (#num-gte size amnt)
 			#vect-slice vec amnt size
 
-let fold-left
-	#vau evn a
-		#do
-			assert (#num-eq (#vect-length a) 3)
-			let v (eval evn (#vect-nth a 0))
-			let state (eval evn (#vect-nth a 1))
-			let f (eval evn (#vect-nth a 2))
-			if (#num-eq (#vect-length v) 0)
-				, state
-				do
-					let vf (#vect-nth v 0)
-					let new-state (f state vf)
-					fold-left (tail v) new-state f
-
 let foldl
 	#vau e a
 		#do
-			assert (#num-eq (#vect-length a) 2)
+			assert (#num-eq (#vect-length a) 3)
 			let f (eval e (#vect-nth a 0))
-			let v (eval e (#vect-nth a 1))
-			assert (#num-gte (#vect-length v) 1)
-			let first (#vect-nth v 0)
-			if (#num-eq (#vect-length v) 1)
-				, first
-				do
-					let second (#vect-nth v 1)
-					let res (f first second)
-					foldl f (#vect-cons (drop v 2) res)
+			let state (eval e (#vect-nth a 1))
+			let vec (eval e (#vect-nth a 2))
+			if (#num-eq (#vect-length vec) 0)
+				, state
+				foldl f (f state (head vec)) (tail vec)
 
 let vect-make
 	#vau orig-e a
@@ -82,7 +72,8 @@ let vect-make
 					let n (#eval e2 (#vect-nth a2 1))
 					let r (eval orig-e n)
 					#vect-append astate r
-			#vect-cons a ()
+			()
+			, a
 
 
 ; Since this is soooo slow, we will cheat and use a hacked
@@ -90,8 +81,8 @@ let vect-make
 ; called fn-real and should be periodically tested, to make
 ; sure it still works ;D
 
-let fnc #fn
-let fn
+let fn #fn
+let fn-real
 	#vau e a
 		#do
 			let arg-symbols (#vect-nth a 0)
@@ -109,7 +100,8 @@ let fn
 									vect-make
 										#dict-insert old-env new-arg (eval e2 (#vect-nth a2 count))
 										#num-add count 1
-							#vect-cons arg-symbols (vect-make e 0)
+							vect-make e 0
+							, arg-symbols
 					let built-env (#vect-nth fold-result 0)
 					eval built-env body
 
@@ -129,12 +121,13 @@ let false #bool-false
 
 let filter
 	fn (vec f)
-		fold-left vec ()
+		foldl
 			fn (s x)
 				if (f x)
 					#vect-append s x
 					, s
-
+			, ()
+			, vec
 
 ; What I want now is a convenient anonymous function
 ; so I can write (\ eq %1 %2)
