@@ -15,7 +15,7 @@ Status
 
   * Language fundamentals **Done**
   * Simple interpretter **Done**
-  * Standard library **In progress**
+  * Core library **In progress**
   * Self-hosting **TODO**
   * Javascript compiler **TODO**
   * Documentation **TODO**

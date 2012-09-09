@@ -184,7 +184,7 @@ object Interpretter {
           // vector stuff
           case VectAppend => evaledArgs() match {
             case Vect(vect: Vect, v) => vect.append(v)
-            case x => sys.error ("args were: " + x)
+            case x => sys.error("args were: " + x)
           }
           case VectCons => evaledArgs() match {
             case Vect(vect: Vect, v) => vect.cons(v)
@@ -264,6 +264,26 @@ object Interpretter {
             case Vect(vec: Vect) => vec.length
           }
 
+          // performance hacks
+          case Fn => rawArgs match {
+            case Vect(symbols: Vect, body) =>
+
+              val processedSymbols = for (s <- symbols.data) yield {
+                !e.contains(s)
+                s.asInstanceOf[Symbol]
+              }
+
+              // TODO: should check that none of the processedSymbols are the same
+
+              FnRun(e, processedSymbols, body)
+          }
+          case FnRun(capEnv, symbols, body) => {
+            val arguments = evaledArgs
+            require(symbols.length == arguments.length, "Function expected: " + symbols.length + " arguments, but got: " + arguments + " instead")
+
+            val newEnv = symbols.zip(arguments.data).foldLeft(capEnv) { (a, b) => a + b }
+            eval(newEnv, body)
+          }
         }
       }
       case x => x
@@ -313,7 +333,7 @@ object Interpretter {
                 assert(r.asInstanceOf[Vect].length > single.length)
                 r
             }
-            
+
             val brokenResult = LetResult(v)
             brokenResult.setPostFunction {
               r =>
@@ -324,7 +344,7 @@ object Interpretter {
             (Some(multi(1).asInstanceOf[Symbol]) -> brokenResult) +: built
 
           } else {
-            v.setPostFunction { r => r.asInstanceOf[Vect].length == single.length ; r }
+            v.setPostFunction { r => r.asInstanceOf[Vect].length == single.length; r }
             built
           }
 
@@ -463,8 +483,16 @@ object Interpretter {
   object Fails extends WFunc
   object Error extends WFunc
 
+  // performance hacks
+  object Fn extends WFunc
+
   case class VauRun(capEnv: Dict, envS: Symbol, argS: Symbol, capCode: Any) extends WFunc {
     override def toString = "$vau$"
+  }
+
+  // bit of a hack
+  case class FnRun(capEnv: Dict, symbols: Seq[Symbol], capCode: Any) extends WFunc {
+    override def toString = "$fnrun"
   }
 
   private def startingEnv = Dict() +
@@ -532,6 +560,7 @@ object Interpretter {
     // debug
     (Symbol("#error") -> Error) +
     (Symbol("#fails") -> Fails) +
-    (Symbol("#trace") -> Trace)
-
+    (Symbol("#trace") -> Trace) +
+    // performance hacks
+    (Symbol("#fn") -> Fn)
 }

@@ -84,6 +84,13 @@ let vect-make
 					#vect-append astate r
 			#vect-cons a ()
 
+
+; Since this is soooo slow, we will cheat and use a hacked
+; builtin provided by the interpretter. The real one is
+; called fn-real and should be periodically tested, to make
+; sure it still works ;D
+
+let fnc #fn
 let fn
 	#vau e a
 		#do
@@ -92,7 +99,7 @@ let fn
 			#vau e2 a2
 				#do
 					let fold-result
-						fold-left arg-symbols (vect-make e 0)
+						foldl
 							#vau fe fa
 								#do
 									let state (eval fe (#vect-nth fa 0))
@@ -102,6 +109,7 @@ let fn
 									vect-make
 										#dict-insert old-env new-arg (eval e2 (#vect-nth a2 count))
 										#num-add count 1
+							#vect-cons arg-symbols (vect-make e 0)
 					let built-env (#vect-nth fold-result 0)
 					eval built-env body
 
