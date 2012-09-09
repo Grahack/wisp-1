@@ -180,6 +180,9 @@ object Interpretter {
           case SymToString => evaledArgs() match {
             case Vect(sym: Symbol) => sym.name
           }
+          case SymEq => evaledArgs() match {
+            case Vect(a: Symbol, b: Symbol) => a == b
+          }
 
           // vector stuff
           case VectAppend => evaledArgs() match {
@@ -281,7 +284,13 @@ object Interpretter {
             val arguments = evaledArgs
             require(symbols.length == arguments.length, "Function expected: " + symbols.length + " arguments, but got: " + arguments + " instead")
 
-            val newEnv = symbols.zip(arguments.data).foldLeft(capEnv) { (a, b) => a + b }
+            val newEnv = symbols.zip(arguments.data).foldLeft(capEnv) { (a, b) =>
+
+              if (b._1 == Symbol("_"))
+                a
+              else
+                a + b
+            }
             eval(newEnv, body)
           }
         }
@@ -455,6 +464,7 @@ object Interpretter {
 
   // sym stuff
   object SymToString extends WFunc
+  object SymEq extends WFunc
 
   // Vector Stuff
   object VectAppend extends WFunc
@@ -535,6 +545,7 @@ object Interpretter {
     (Symbol("#str-to-vect") -> StrToVect) +
     // sym stuff
     (Symbol("#sym-to-string") -> SymToString) +
+    (Symbol("#sym-eq") -> SymEq) +
     // vect functions
     (Symbol("#vect-append") -> VectAppend) +
     (Symbol("#vect-cons") -> VectCons) +

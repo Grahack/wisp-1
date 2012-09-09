@@ -97,9 +97,11 @@ let fn-real
 									let new-arg (eval fe (#vect-nth fa 1))
 									let old-env (#vect-nth state 0)
 									let count (#vect-nth state 1)
-									vect-make
-										#dict-insert old-env new-arg (eval e2 (#vect-nth a2 count))
-										#num-add count 1
+									if (#sym-eq new-arg (#quote _))
+										vect-make old-env (#num-add count 1)
+										vect-make
+											#dict-insert old-env new-arg (eval e2 (#vect-nth a2 count))
+											#num-add count 1
 							vect-make e 0
 							, arg-symbols
 					let built-env (#vect-nth fold-result 0)
