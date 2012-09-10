@@ -18,7 +18,7 @@ object Interpretter {
     })
 
     val (env, paths) =
-      imports.foldLeft((startingEnv, IndexedSeq(path)))(
+      imports.data.foldLeft((startingEnv, IndexedSeq(path)))(
         (ps, nextImport) =>
           nextImport match {
             case 'import +: (importFilePath: String) +: Vect() => {
@@ -195,15 +195,13 @@ object Interpretter {
           case VectSlice => evaledArgs() match {
             case Vect(vect: Vect, from: Int, until: Int) => vect.slice(from, until)
           }
-
           case VectNth => evaledArgs() match {
             case Vect(vect: Vect, index: Int) => vect(index)
           }
-
           case VectReduce => evaledArgs() match {
-            case Vect(vect: Vect, func) => {
+            case Vect(func, vect: Vect) =>
               eval(e, vect.reduce((a, b) => Vect(Quote, eval(e, Vect(func, a, b)))))
-            }
+   
           }
 
           // dictionary stuff
@@ -282,40 +280,26 @@ object Interpretter {
           }
           case FnRun(capEnv, symbols, body) => {
             val arguments = evaledArgs
-            require(symbols.length == arguments.length, "Function expected: " + symbols.length + " arguments, but got: " + arguments + " instead")
 
-            val newEnv = symbols.zip(arguments.data).foldLeft(capEnv) { (a, b) =>
-
-              if (b._1 == Symbol("_"))
-                a
-              else
-                a + b
+            val newEnv = symbols.zipWithIndex.foldLeft((capEnv -> false)) {
+              (a, b) =>
+                if (a._2 == true)
+                  a._1 + (b._1 -> arguments.slice(b._2 - 1, arguments.length)) -> true
+                else if (b._1 == Symbol("_"))
+                  a
+                else if (b._1 == Symbol("&"))
+                  (a._1 -> true)
+                else
+                  a._1 + (b._1 -> arguments(b._2)) -> false
             }
-            eval(newEnv, body)
+
+            eval(newEnv._1, body)
           }
         }
       }
       case x => x
     }
   }
-
-  def foldReduce(op: (Int, Int) => Boolean, e: Dict, args: Vect): Boolean = {
-    require(args.length > 1)
-
-    var acc = eval(e, args.head).asInstanceOf[Int]
-
-    args.tail.foreach { a =>
-      val r = eval(e, a).asInstanceOf[Int]
-      if (op(acc, r))
-        acc = r
-      else
-        return false
-    }
-
-    true
-  }
-
-  def strict = false
 
   def buildDoBlock(e: Dict, forms: Vect): (IndexedSeq[Any], Dict) = {
     def letBuilder(form: Any, v: LetResult): Iterable[(Option[Symbol], LetResult)] = {
@@ -530,6 +514,7 @@ object Interpretter {
     (Symbol("#num-gte") -> NumGreaterThanOrEqual) +
     (Symbol("#num-lt") -> NumLessThan) +
     (Symbol("#num-lte") -> NumLessThanOrEqual) +
+    (Symbol("#num-mult") -> NumMult) +
     (Symbol("#num-neq") -> NumNeq) +
     (Symbol("#num-sub") -> NumSub) +
     (Symbol("#num-to-str") -> NumToString) +

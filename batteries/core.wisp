@@ -24,6 +24,7 @@ let ,
 			assert (#num-eq (#vect-length a) 1)
 			#eval e (#vect-nth a 0)
 
+; Get the first element of a non-empty vector
 let head
 	#vau e a
 		do
@@ -32,6 +33,7 @@ let head
 			assert (#num-gte (#vect-length vec) 0)
 			#vect-nth vec 0
 
+; Get all, but the first element of a non-empty vector
 let tail
 	#vau e a
 		do
@@ -40,6 +42,26 @@ let tail
 			let size (#vect-length vec)
 			assert (#num-gte size 0)
 			#vect-slice vec 1 size
+
+; Get the last element of a non-empty vector
+let last
+	#vau e a
+		do
+			assert (#num-eq (#vect-length a) 1)
+			let vec (eval e (#vect-nth a 0))
+			let size (#vect-length vec)
+			assert (#num-gte size 0)
+			#vect-nth vec (#num-sub size 1)
+
+; Get all, but the last element of a non-empty vector
+let init
+	#vau e a
+		do
+			assert (#num-eq (#vect-length a) 1)
+			let vec (eval e (#vect-nth a 0))
+			let size (#vect-length vec)
+			assert (#num-gte size 0)
+			#vect-slice vec 0 (#num-sub size 1)
 
 let drop
 	#vau e a
@@ -62,6 +84,16 @@ let foldl
 				, state
 				foldl f (f state (head vec)) (tail vec)
 
+let reduce #vect-reduce
+
+let +
+	fn (& args)
+		reduce #num-add args
+
+let *
+	fn (& args)
+		reduce #num-mult args
+
 let vect-make
 	#vau orig-e a
 		foldl
@@ -74,7 +106,6 @@ let vect-make
 					#vect-append astate r
 			()
 			, a
-
 
 ; Since this is soooo slow, we will cheat and use a hacked
 ; builtin provided by the interpretter. The real one is
@@ -97,12 +128,30 @@ let fn-real
 									let new-arg (eval fe (#vect-nth fa 1))
 									let old-env (#vect-nth state 0)
 									let count (#vect-nth state 1)
-									if (#sym-eq new-arg (#quote _))
-										vect-make old-env (#num-add count 1)
-										vect-make
-											#dict-insert old-env new-arg (eval e2 (#vect-nth a2 count))
-											#num-add count 1
-							vect-make e 0
+									let encounted-vargs (#vect-nth state 2)
+									if (#bool-eq encounted-vargs true)
+										#do
+											let map-eval
+												#vau eme ame
+													#do
+														assert (#num-eq (#vect-length ame) 1)
+														let vec (eval eme (#vect-nth ame 0))
+														if (#num-eq (#vect-length vec) 0)
+															, ()
+															#vect-append (map-eval (init vec)) (eval e2 (last vec))
+											vect-make
+												#dict-insert old-env new-arg (map-eval (drop a2 count))
+												#num-add count 1
+												, true
+										if (#sym-eq new-arg (#quote _))
+											vect-make old-env (#num-add count 1) false
+											if (#sym-eq new-arg (#quote &))
+												vect-make old-env count true
+												vect-make
+													#dict-insert old-env new-arg (eval e2 (#vect-nth a2 count))
+													#num-add count 1
+													, false
+							vect-make e 0 false
 							, arg-symbols
 					let built-env (#vect-nth fold-result 0)
 					eval built-env body

@@ -28,10 +28,8 @@ class Vect(val data: Vector[Any]) {
   def isEmpty = data.isEmpty
   def nonEmpty = data.nonEmpty
   def length = data.length
-
-  def foldLeft[B](z: B)(op: (B, Any) => B): B = {
-    data.foldLeft(z)(op)
-  }
+  
+  def reduce(op: (Any, Any) => Any) = data.reduce(op)
 
   // don't expose to the interpretter:
 
@@ -46,8 +44,6 @@ class Vect(val data: Vector[Any]) {
   }
 
   def map(f: Any => Any) = new Vect(data.map(f))
-
-  def reduce(f: (Any, Any) => Any) = data.reduce(f)
   
   def foreach(f: Any => Unit) = data.foreach(f)
 
