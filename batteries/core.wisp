@@ -11,18 +11,27 @@ let eval #eval
 
 let assert
 	#vau e a
-		#do
-			if (#num-eq (#vect-length a) 1) ()
-				#error "Assert only expects a single argument"
-			let cond (#vect-nth a 0)
-			if (#eval e cond) ()
-				#error "Assertion failed"
+		if (#num-eq (#vect-length a) 0)
+			#error "Assert must be given at least one argument"
+			if (#num-gt (#vect-length a) 2)
+				#error "Assert must not be given more than two arguments (assertion and message)"
+				if (#eval e (#vect-nth a 0)) ()
+					#error
+						if (#num-eq (#vect-length a) 2)
+							#eval e (#vect-nth a 1)
+							, "Assert fail (no msg provided)"
 
 let ,
 	#vau e a
 		do
-			assert (#num-eq (#vect-length a) 1)
+			assert (#num-eq (#vect-length a) 1) ", only expects a single argument"
 			#eval e (#vect-nth a 0)
+
+let empty?
+	fn (vec)
+		#do
+			assert (#type-eq (#type-of vec) #Vect) "empty? expected a vector"
+			#num-eq (#vect-length vec) 0
 
 ; Get the first element of a non-empty vector
 let head
@@ -63,7 +72,8 @@ let init
 			assert (#num-gte size 0)
 			#vect-slice vec 0 (#num-sub size 1)
 
-let drop
+; TODO switch argument order
+let drop-first-n
 	#vau e a
 		#do
 			assert (#num-eq (#vect-length a) 2)
@@ -72,6 +82,21 @@ let drop
 			let size (#vect-length vec)
 			assert (#num-gte size amnt)
 			#vect-slice vec amnt size
+
+
+let drop-last-n
+	fn (n vec)
+		#do
+			let size (#vect-length vec)
+			assert (#num-gte size n) "Can't get drop-last-n of something smaller than n"
+			#vect-slice vec 0 (#num-sub size n)
+
+let last-n
+	fn (n vec)
+		#do
+			let size (#vect-length vec)
+			assert (#num-gte size n) "Can't get last-n of something smaller than n"
+			#vect-slice vec (#num-sub size n) size
 
 let foldl
 	#vau e a
@@ -83,6 +108,28 @@ let foldl
 			if (#num-eq (#vect-length vec) 0)
 				, state
 				foldl f (f state (head vec)) (tail vec)
+
+let not #bool-not
+
+let push #vect-append
+
+let foldl1
+	fn (f vec)
+		#do
+			assert (not (empty? vec))
+			foldl f (head vec) (tail vec)
+
+let foldr
+	fn (f state vec)
+		#if (#num-eq (#vect-length vec) 0)
+			, state
+			foldr f (f state (last vec)) (init vec)
+
+let foldr1
+	fn (f vec)
+		#do
+			assert (not (empty? vec)) "foldr1 expects a non-empty vector"
+			foldr f (last vec) (init vec)
 
 let reduce #vect-reduce
 
@@ -140,7 +187,7 @@ let fn-real
 															, ()
 															#vect-append (map-eval (init vec)) (eval e2 (last vec))
 											vect-make
-												#dict-insert old-env new-arg (map-eval (drop a2 count))
+												#dict-insert old-env new-arg (map-eval (drop-first-n a2 count))
 												#num-add count 1
 												, true
 										if (#sym-eq new-arg (#quote _))
@@ -180,15 +227,65 @@ let filter
 			, ()
 			, vec
 
-; What I want now is a convenient anonymous function
-; so I can write (\ eq %1 %2)
 
 
-let \
+; for chained if statements, mainly
+
+let nest
+	#vau e a
+		eval e
+			foldr1 (fn (x y) (push y x)) a
+
+let < #num-lt
+
+let apply
 	#vau e a
 		#do
-			let syms
-				filter a
-					fn (x) (#type-eq (#type-of x) #Sym)
-			#trace "Symbols are " syms
+			assert (#num-eq (#vect-length a) 2)
+			let f (eval e (#vect-nth a 0))
+			let vec (eval e (#vect-nth a 1))
+			eval e (#vect-cons vec f)
 
+; TODO add check about dropping too much in a step
+let for-all-slide
+	fn (f window step vec)
+		if (< (#vect-length vec) window)
+			, true
+			#do
+				let elems (last-n window vec)
+				if (apply f elems)
+					for-all-slide f window step (drop-last-n step vec) 
+					, false
+
+let __binary-eq
+	fn (a b)
+		nest
+			if (not (#type-eq (#type-of a) (#type-of b)))
+				, false
+			if (#type-eq (#type-of a) #Bool)
+				#bool-eq a b
+			if (#type-eq (#type-of a) #Dict)
+				#error "Dict comparison not yet done"
+			if (#type-eq (#type-of a) #Num)
+				#num-eq a b
+			if (#type-eq (#type-of a) #Str)
+				#str-eq a b
+			if (#type-eq (#type-of a) #Sym)
+				#symb-eq a b
+			if (#type-eq (#type-of a) #Type)
+				#type-eq a b
+			if (#type-of (#type-of a) #Vect)
+				#error "Vect comparison not yet done"
+			#error "Unknown type in comparison"
+
+let ==
+	fn (& args)
+		#do
+			assert (#num-gte (#vect-length args) 2) "== needs at least two arguments"
+			for-all-slide __binary-eq 2 1 args
+
+let !=
+	fn (& args)
+		#do
+			assert (#num-gte (#vect-length args) 2) "!= needs at least two arguments"
+			not (apply == args)

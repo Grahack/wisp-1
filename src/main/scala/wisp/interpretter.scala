@@ -1,8 +1,5 @@
 package wisp
 
-import com.sun.org.apache.xpath.internal.objects.GreaterThanOrEqualComparator
-import scala.xml.TypeSymbol
-
 object Interpretter {
 
   import java.nio.file.Path
@@ -187,7 +184,6 @@ object Interpretter {
           // vector stuff
           case VectAppend => evaledArgs() match {
             case Vect(vect: Vect, v) => vect.append(v)
-            case x => sys.error("args were: " + x)
           }
           case VectCons => evaledArgs() match {
             case Vect(vect: Vect, v) => vect.cons(v)
@@ -201,7 +197,7 @@ object Interpretter {
           case VectReduce => evaledArgs() match {
             case Vect(func, vect: Vect) =>
               eval(e, vect.reduce((a, b) => Vect(Quote, eval(e, Vect(func, a, b)))))
-   
+
           }
 
           // dictionary stuff
@@ -497,15 +493,15 @@ object Interpretter {
     (Symbol("#quote") -> Quote) +
     (Symbol("#vau") -> Vau) +
     // Types
+    (Symbol("#Bool") -> TypeBool) +
+    (Symbol("#Dict") -> TypeDict) +
     (Symbol("#Num") -> TypeNum) +
     (Symbol("#Str") -> TypeStr) +
-    (Symbol("#Bool") -> TypeBool) +
-    (Symbol("#Vect") -> TypeVect) +
     (Symbol("#Sym") -> TypeSym) +
-    (Symbol("#Dict") -> TypeDict) +
     (Symbol("#Type") -> TypeType) +
     (Symbol("#type-eq") -> TypeEq) +
     (Symbol("#type-of") -> TypeOf) +
+    (Symbol("#Vect") -> TypeVect) +
     // some num stuff
     (Symbol("#num-add") -> NumAdd) +
     (Symbol("#num-div") -> NumDiv) +
