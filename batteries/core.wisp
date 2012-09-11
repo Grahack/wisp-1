@@ -141,6 +141,12 @@ let *
 	fn (& args)
 		reduce #num-mult args
 
+let quote
+	#vau e a
+		#do
+			assert (#num-eq (#vect-length a) 1) "Quote expects a single argument"
+			#vect-nth a 0
+
 let vect-make
 	#vau orig-e a
 		foldl
@@ -190,9 +196,9 @@ let fn-real
 												#dict-insert old-env new-arg (map-eval (drop-first-n a2 count))
 												#num-add count 1
 												, true
-										if (#sym-eq new-arg (#quote _))
+										if (#sym-eq new-arg (quote _))
 											vect-make old-env (#num-add count 1) false
-											if (#sym-eq new-arg (#quote &))
+											if (#sym-eq new-arg (quote &))
 												vect-make old-env count true
 												vect-make
 													#dict-insert old-env new-arg (eval e2 (#vect-nth a2 count))

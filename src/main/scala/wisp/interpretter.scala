@@ -80,9 +80,6 @@ object Interpretter {
           case If => rawArgs match {
             case Vect(cond, trueCase, falseCase) => if (eval(e, cond).asInstanceOf[Boolean]) eval(e, trueCase) else eval(e, falseCase)
           }
-          case Quote => rawArgs match {
-            case Vect(x) => x
-          }
           case Vau => rawArgs match {
             case Vect(envS: Symbol, argS: Symbol, code) =>
               require(!e.contains(envS), "Can't use symbol " + envS + " for binding an environment, as it already exists")
@@ -195,9 +192,7 @@ object Interpretter {
             case Vect(vect: Vect, index: Int) => vect(index)
           }
           case VectReduce => evaledArgs() match {
-            case Vect(func, vect: Vect) =>
-              eval(e, vect.reduce((a, b) => Vect(Quote, eval(e, Vect(func, a, b)))))
-
+            case Vect(func, vect: Vect) => eval(e, vect.reduce((a,b) => Vect(func, a, b)))
           }
 
           // dictionary stuff
@@ -410,7 +405,6 @@ object Interpretter {
   object Do extends WFunc
   object Eval extends WFunc
   object If extends WFunc
-  object Quote extends WFunc
   object Vau extends WFunc
 
   // type stuff
@@ -490,7 +484,6 @@ object Interpretter {
     (Symbol("#do") -> Do) +
     (Symbol("#eval") -> Eval) +
     (Symbol("#if") -> If) +
-    (Symbol("#quote") -> Quote) +
     (Symbol("#vau") -> Vau) +
     // Types
     (Symbol("#Bool") -> TypeBool) +
