@@ -72,7 +72,7 @@ let init
 			assert (#num-gte size 0)
 			#vect-slice vec 0 (#num-sub size 1)
 
-; TODO switch argument order
+
 let drop-first-n
 	#vau e a
 		#do
@@ -85,14 +85,14 @@ let drop-first-n
 
 
 let drop-last-n
-	fn (n vec)
+	fn (vec n)
 		#do
 			let size (#vect-length vec)
 			assert (#num-gte size n) "Can't get drop-last-n of something smaller than n"
 			#vect-slice vec 0 (#num-sub size n)
 
 let last-n
-	fn (n vec)
+	fn (vec n)
 		#do
 			let size (#vect-length vec)
 			assert (#num-gte size n) "Can't get last-n of something smaller than n"
@@ -135,11 +135,11 @@ let reduce #vect-reduce
 
 let +
 	fn (& args)
-		reduce #num-add args
+		reduce args #num-add
 
 let *
 	fn (& args)
-		reduce #num-mult args
+		reduce args #num-mult
 
 let quote
 	#vau e a
@@ -165,8 +165,8 @@ let vect-make
 ; called fn-real and should be periodically tested, to make
 ; sure it still works ;D
 
-let fn #fn
-let fn-real
+; let fn #fn
+let fn
 	#vau e a
 		#do
 			let arg-symbols (#vect-nth a 0)
@@ -258,9 +258,9 @@ let for-all-slide
 		if (< (#vect-length vec) window)
 			, true
 			#do
-				let elems (last-n window vec)
+				let elems (last-n vec window)
 				if (apply f elems)
-					for-all-slide f window step (drop-last-n step vec) 
+					for-all-slide f window step (drop-last-n vec step) 
 					, false
 
 let __binary-eq

@@ -192,12 +192,12 @@ object Interpretter {
             case Vect(vect: Vect, index: Int) => vect(index)
           }
           case VectReduce => evaledArgs() match {
-            case Vect(func, vect: Vect) => eval(e, vect.reduce((a,b) => Vect(func, a, b)))
+            case Vect(vect: Vect, func) => eval(e, vect.reduce((a,b) => Vect(func, a, b)))
           }
 
           // dictionary stuff
           case DictContains => evaledArgs() match {
-            case Vect(lu: Dict, k) => lu.contains(k)
+            case Vect(dict: Dict, k) => dict.contains(k)
           }
 
           case DictGet => evaledArgs() match {
