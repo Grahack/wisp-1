@@ -19,7 +19,7 @@ class Dict(val data: scala.collection.immutable.HashMap[Any, Any]) {
   }
 
   def merge(r: Dict): Dict = {
-    // TODO: something smart
+    // TODO: some smart checking or something
     new Dict(data ++ r.data)
   }
   

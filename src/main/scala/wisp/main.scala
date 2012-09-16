@@ -2,70 +2,86 @@ package wisp
 
 import java.nio.file.Paths
 import java.nio.file.Path
-import jline.console.ConsoleReader
-import jline.console.completer.Completer
 import java.nio.file.StandardWatchEventKinds
+import java.text.DecimalFormat
 
 object Main {
   def main(args: Array[String]) {
 
-    val interactive = args.contains("-i")
     val watch = args.contains("-w")
+    val verbose = args.contains("-v")
 
-    require(!(interactive && watch), "Can't watch the filesystem and use interactive as well")
-
-    val rest = args.filter(x => x != "-i" && x != "-w")
+    val rest = args.filter(x => x != "-w" && x != "-v")
 
     if (rest.size != 1) {
       println(
         """Welcome to Wisp!
           
-usage: wisp [-i | -w] file-to-interpret.wisp
+usage: wisp [-w -d] file-to-interpret.wisp
 
 Valid options are:
-         
-  -i        Interactive. After running the program, drop into
-            an interactive repl session
-          
-          OR
 
   -w        Watch. After running the program, watch the file
             and its transitive dependencies for any changes. If
-            any files change, rerun the program""")
+            any files change, rerun the program
+
+  -v        Verbose. Output some verbose information, such as
+            awesome ascii-art dependency graphs. """)
     } else {
       val path = Paths.get(rest.head)
 
-      if (interactive)
-        runInteractive(path)
-      else if (watch)
-        runWatch(path)
+      val dag = loadAll(Dag[Path, Any](), path)
+
+      if (verbose) {
+        println("File dependency graph:\n" + dag.toAscii)
+      }
+
+      if (watch)
+        runWatch(dag, verbose)
       else
-        println(Interpretter(path)._1)
+        runDag(dag, verbose)
 
     }
   }
 
-  def runWatch(path: Path) = {
+  def loadAll(current: Dag[Path, Any], path: Path): Dag[Path, Any] = {
 
-    var watching = IndexedSeq(path)
+    val (imports, value) = Reader(path)
 
-    while (true) {
-      try {
-        val ((res, _, files), time) = timeFunc(Interpretter(path))
-
-        println("Res: " + res)
-        println("Took: " + time + "ms")
-
-        watching = files
-      } catch { case x: Throwable => println("Caught errror: " + x) }
-
-      require(watching.nonEmpty)
-
-      print("Waiting on file changes...")
-      blockOn(watching)
-      println("\n")
+    imports.foldLeft(current.add(path, value, imports)) {
+      (a, b) =>
+        if (!a.payload.contains(b))
+          loadAll(a, b)
+        else
+          a
     }
 
+  }
+
+  def runDag(dag: Dag[Path, Any], verbose: Boolean): Any = {
+
+    val data = dag.topologicalSort.reverse.map(x => x -> dag.payload(x))
+
+    val r = data.foldLeft(Interpretter.startingEnv: Any) {
+      case (env, (path, form)) =>
+        require(env.isInstanceOf[Dict], "Expected the result of an import to give us an environment, instead found: " + env)
+
+        if (verbose)
+          println("About to interpret file: " + path)
+
+        val (result, t) = timeFunc(Interpretter(env.asInstanceOf[Dict], form))
+
+        if (verbose)
+          println("..took " + t)
+          
+        result
+    }
+
+    println(r)
+  }
+
+  def runWatch(dag: Dag[Path, Any], verbose: Boolean) {
+    sys.error("Run Watch not yet supported")
   }
 
   def blockOn(watching: IndexedSeq[Path]): Unit = {
@@ -108,85 +124,23 @@ Valid options are:
 
   }
 
-  def runInteractive(path: Path) {
-
-    var (res, env, _) = Interpretter(path)
-
-    val console = new ConsoleReader
-
-    env = env + (Symbol(":res0") -> res)
-    console.println(":res0 = " + res)
-
-    console.addCompleter(new WispCompleter(env))
-
-    var count = 0
-
-    while (true) {
-      val line = console.readLine("~> ")
-
-      if (line == null)
-        return
-
-      try {
-        val processed = Reader(line).foreach { processed =>
-
-          val (res, time) = timeFunc(Interpretter.eval(env, processed))
-
-          count = count + 1
-          val newSymb = ":res" + count
-          env = env + (Symbol(newSymb) -> res)
-
-          val summary = newSymb + " = " + res
-          val info = "[Took " + time + "ms]"
-
-          val spaces = console.getTerminal.getWidth - summary.length - info.length
-
-          console.print(summary)
-          if (spaces > 0)
-            console.print(" " * spaces)
-          else
-            console.print("\n")
-          console.println(info)
-          console.flush()
-        }
-
-      } // catch { case x => console.println("Caught errror: " + x) }
-    }
-  }
-
-  def timeFunc[A](f: => A) = {
+  def timeFunc[A](fn: => A) = {
     val s = System.nanoTime
-    val ret = f
-    (ret, (System.nanoTime - s) / 1e6)
+    val ret = fn
+    val f = System.nanoTime
+
+    val d = System.nanoTime - s
+
+    val format = new DecimalFormat("#.##")
+
+    val time = (f - s) match {
+      case ns if ns < 1000 => ns + "ns"
+      case µs if µs < 1e6 => format.format(µs / 1e3) + "µs"
+      case ms if ms < 1e9 => format.format(ms / 1e6) + "ms"
+      case s => format.format(s / 1e9) + "s"
+    }
+
+    (ret, time)
   }
 }
 
-class WispCompleter(env: Dict) extends Completer {
-
-  def complete(buffer: String, at: Int, results: java.util.List[CharSequence]) = {
-
-    val (before, start) = split(buffer, at)
-
-    env.foreach(f => {
-      // CHECK: the static-env really should never contain non-symbols, eh?
-      val n = f._1.asInstanceOf[Symbol].name
-      if (n.startsWith(before))
-        results.add(n + " ")
-    })
-
-    start
-  }
-
-  def split(buffer: String, at: Int): (String, Int) = {
-    val from = math.max(at - 1, 0)
-
-    // TODO: probably a nicer way to write this then nested maxes
-    val lio = math.max(buffer.lastIndexOf(' ', from),
-      math.max(buffer.lastIndexOf('(', from),
-        buffer.lastIndexOf(')', from)))
-    val start = if (lio < at) lio + 1 else at
-    val before = buffer.substring(math.min(start, buffer.length), at)
-
-    (before, start)
-  }
-}

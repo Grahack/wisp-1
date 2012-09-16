@@ -9,19 +9,36 @@ object Reader extends Parsers {
 
   type Elem = Char
 
-  def apply(input: String): Vect = Reader(new CharSequenceReader(input))
+  def apply(path: Path): (Set[Path], Any) = {
 
-  def apply(input: Path): Vect = Reader(new CharSequenceReader(new String(Files.readAllBytes(input))))
+    val csr = new CharSequenceReader(new String(Files.readAllBytes(path)))
 
-  def apply(csr: scala.util.parsing.input.Reader[Char]): Vect = {
     val p = vrep((atomListParser(0)) <~ rep(eol))(csr)
 
-    p match {
-      case Success(res, next) if next.atEnd => res
-      case f: Failure => sys.error(f.toString)
-      case x => sys.error("Couldn't FULLY parse, result: " + x)
+    val forms = p match {
+      case Success(res, next) => {
+        if (next.atEnd)
+          res
+        else
+          sys.error("Couldn't FULLY parse. We parsed: " + res + " but didn't get: " + next)
+      }
+      case f: Failure => sys.error("Parser failure: " + f.toString)
+    }
+
+    forms.headOption match {
+      case Some('import +: paths) =>
+        require(forms.length == 2, "A top level with an import, must only have two forms")
+
+        val imports = paths.data.map(x => path.resolveSibling(x.asInstanceOf[String]))
+
+        (imports.toSet -> forms.last)
+
+      case _ =>
+        require(forms.length == 1, "A top level with an import, must only have a single form")
+        (Set() -> forms.head)
     }
   }
+
 
   private def atomListParser(depth: Int): Parser[Any] =
     rep(eol) ~>
@@ -76,5 +93,4 @@ object Reader extends Parsers {
   // get around annoying precedent rule of <~
   implicit private def toUnannoying[T](p: Parser[T]): UnannoyingParser[T] = new UnannoyingParser(p)
   private class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
-
 }

@@ -1,48 +1,20 @@
 Wisp Primitives
 ---------------
 
-These are the heart-and-soul of wisp. These primitives take in their arguments unevaluated, and do magical things with them, based on the evaluation rules described here. Unless you're working on a wisp implementation, or developing the core library (or a replacement for it) you should never actually use these primitives directly. That's why they start with a <code>#</code> to make them a bit uglier to prevent use. All the high-level functionality is built ontop of these primitives.
+These are the heart-and-soul of wisp. These primitives take in their arguments unevaluated, and do magical things with them, based on the evaluation rules described here. Unless you're working on a wisp implementation, or developing the standard library (or a replacement for it) you should never actually use these primitives directly. That's why they start with a <code>#</code> to make them a bit uglier to prevent use. All the high-level functionality is built on-top of these primitives.
 
 In addition to these primitives, there's a lot of "built-in" functions to "hook-into" the underlying system (e.g. add two numbers) or provide the basic datastructures.
 
 <table>
 	<tr>
-		<th>Builtin</th>
-		<th>Arguments</th>
-		<th>Description</th>
-	</tr>
-	<tr>
-		<th>#do</th>
-		<td>form*</td>
-		<td>
-			<p><code>#do</code> sequentially evaluates statements (in the context of the caller), and returns the result of evaluating the last statement.</p>
-<pre><code>#do
-	"blah"
-	40
-	#num-add 84 23<code></pre>
-			<p>would return 107.</p>
-
-			<p>The last statement of a <code>#do</code> ideally would be tail-call optimized, as is the case in the current scala implementation. But its yet to be seen how practical this is to guarantee when compiling to javascript.</p>
-
-			<p>This sort of style <code>#do</code> allows is especially useful for doing outputing some debug information, or making some assertions</p>
-
-			<p>Note, it is my intention to attempt to remove <code>#do</code> with a version built ontop of <code>#vau</code></p>
-		</td>
-	</tr>
-	<tr>
 		<th>#eval</th>
 		<td>env form</td>
 		<td>
-			<p>The first argument <code>env</code> is immediately evaluated (in the context of the caller) which is expected to result in a <code>Dict</code>. Now the second argument <code>form</code>, is evaluated in the context of <code>env</code> (the resolved/evaluated first argument).</p>
+			<p>This is actually a strict function. That is, both arguments are first immediately evaluted in the context of the caller. The first argument <code>env</code> must be a <code>Dict</code>, while the second argument can be of any type. <code>#eval</code> will evaluate <code>form</code> in the context of <code>env</code> and return the result.</p>
 
-<pre><code>#eval
-	a-dict-with-x-and-y-in-it
-	#num-add x y
-</code></pre>
+			<p>Occasionally it's desirable for <code>#eval</code> to not act as a strict function. This is very easy to do, by using a quote function.</p>
 
-		<p>would evaluate <code>(#num-add x y)</code> in the context of <code>a-dict-with-x-and-y-in-it</code> (which presumably has x and y defined as some numbers).</p>
-
-		<p>Unlike most lisps, using #eval (or rather, nicer wrapper of it) is not a poor practise, and almost always can be eliminated with powerful static analysis, and partial evaluation. And due to wisps fexpr and static scoping, it allows to making composible and safer "primitives" than something like macros.</p>
+			<p>Unlike most lisps, using <code>#eval</code> (or rather, nicer wrapper of it) is not a poor practise, and almost always can be eliminated with powerful static analysis, and partial evaluation. And due to wisps fexpr and static scoping, it allows to making composible and safer "primitives" than something like macros.</p>
 		</td>
 	</tr>
 	<tr>
