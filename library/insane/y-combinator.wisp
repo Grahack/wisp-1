@@ -1,5 +1,5 @@
 import "env-add.wisp"
 
-(__env-add __Y (#vau e f ((#vau e2 x2 ((#eval e (#vect-nth f 0)) ((#eval e2 (#vect-nth x2 0)) (#eval e2 (#vect-nth x2 0))))) (#vau e2 x2 ((#eval e (#vect-nth f 0)) ((#eval e2 (#vect-nth x2 0)) (#eval e2 (#vect-nth x2 0))))))))
+(__env-add __Y (#vau f e ((#vau x2 e2 ((#eval (#vect-nth f 0) e) ((#eval (#vect-nth x2 0) e2) (#eval (#vect-nth x2 0) e2)))) (#vau x2 e2 ((#eval (#vect-nth f 0) e) ((#eval (#vect-nth x2 0) e2) (#eval (#vect-nth x2 0) e2)))))))
 
 

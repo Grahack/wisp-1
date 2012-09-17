@@ -4,10 +4,10 @@ import
 	"env-add.wisp"
 
 __env-add __map-eval
-	#vau e a
+	#vau a e
 		__map
 			__quote ((#num-add 1 2) (#num-add 4 3))
-			#vau de da
+			#vau da de
 				#eval
-					#eval e (#vect-nth a 0)
-					#eval de (#vect-nth da 0)
+					#eval (#vect-nth a 0) e
+					#eval (#vect-nth da 0) de

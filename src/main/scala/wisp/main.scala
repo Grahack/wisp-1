@@ -69,7 +69,7 @@ Valid options are:
         if (verbose)
           println("About to interpret file: " + path)
 
-        val (result, t) = timeFunc(Interpretter(env.asInstanceOf[Dict], form))
+        val (result, t) = timeFunc(Interpretter(form,env.asInstanceOf[Dict]))
 
         if (verbose)
           println("..took " + t)

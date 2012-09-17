@@ -4,13 +4,13 @@ import
 
 __env-add fact
 	__Y
-		#vau e f
-			#vau e2 n2
-				#if (#num-eq (#eval e2 (#vect-nth n2 0)) 0)
+		#vau fnc e
+			#vau n2 e2
+				#if (#num-eq (#eval (#vect-nth n2 0) e2) 0)
 					1
 					#num-mult
-						#eval e2 (#vect-nth n2 0)
-						(#eval e (#vect-nth f 0))
-							#num-sub (#eval e2 (#vect-nth n2 0)) 1
+						#eval (#vect-nth n2 0) e2
+						(#eval (#vect-nth fnc 0) e)
+							#num-sub (#eval (#vect-nth n2 0) e2) 1
 
 

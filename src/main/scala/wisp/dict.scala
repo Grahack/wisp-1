@@ -33,5 +33,5 @@ class Dict(val data: scala.collection.immutable.HashMap[Any, Any]) {
 
   def size = data.size
   
-  override def toString = data.toString
+  override def toString = "{Dict. size: " + size + " }"
 }

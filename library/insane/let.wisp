@@ -3,7 +3,7 @@ import
 	"env-add.wisp"
 
 __env-add __let
-	#vau eq aq
+	#vau aq eq
 		#eval
-			((#vau ew aw ew))
 			#vect-append (#vect-append (#vect-append () __do-let) eq) (#vect-append (#vect-append () __quote) aq)
+			((#vau aw ew ew))

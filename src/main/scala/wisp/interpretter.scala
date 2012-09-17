@@ -5,7 +5,7 @@ object Interpretter {
   import java.nio.file.Path
   import java.nio.file.Paths
 
-  def apply(e: Dict, form: Any): Any = eval(e, form)
+  def apply(form: Any, e: Dict): Any = eval(form, e)
 
   object WTypes extends Enumeration {
     type WType = Value
@@ -28,33 +28,29 @@ object Interpretter {
   }
   import WFunc._
 
-  def eval(e: Dict, form: Any): Any = {
+  def eval(form: Any, e: Dict): Any = {
 
     form match {
-      case s: Symbol => {
-        require(s != Symbol("_"), "You really shouldn't use _ as a resolvable symbol")
-        e(s)
-      }
-
+      case s: Symbol => e(s)
       case f +: rawArgs => {
-        eval(e, f) match {
-          case VauRun(capEnv, envS, argS, capCode) => eval(capEnv + (envS -> e) + (argS -> rawArgs), capCode)
+        eval(f, e) match {
+          case VauRun(capEnv, argS, envS, capCode) => eval(capCode, capEnv + (argS -> rawArgs) + (envS -> e))
           case Vau => rawArgs match {
-            case Vect(envS: Symbol, argS: Symbol, code) =>
-              require(!e.contains(envS), "Can't use symbol " + envS + " for binding an environment, as it already exists")
+            case Vect(argS: Symbol, envS: Symbol, code) =>
               require(!e.contains(argS), "Can't use symbol " + argS + " for binding an argument list, as it already exists")
+              require(!e.contains(envS), "Can't use symbol " + envS + " for binding an environment, as it already exists")
               require(envS != argS, "Can't use the same symbol for binding the environment and argument")
-              VauRun(e, envS, argS, code)
-            case x => sys.error("#vau expects three arguments, an env symbol, an arg symbol and the body of the code. Instead found: " + rawArgs)
+              VauRun(e, argS, envS, code)
+            case x => sys.error("#vau expects three arguments, an arg symbol, an env symbol, and the body of the code. Instead found: " + rawArgs)
           }
           case If => {
             require(rawArgs.length == 3, "If statement require three arguments (cond, trueCase, false), was given: " + rawArgs)
-            val cond = eval(e, rawArgs(0))
+            val cond = eval(rawArgs(0), e)
             require(cond.isInstanceOf[Boolean], "Condition in #if statement, should evalute to a boolean -- but instead got: " + cond + ". If statement was: " + rawArgs)
-            if (cond.asInstanceOf[Boolean]) eval(e, rawArgs(1)) else eval(e, rawArgs(2))
+            if (cond.asInstanceOf[Boolean]) eval(rawArgs(1), e) else eval(rawArgs(2), e)
           }
-          case wf: WFunc => (rawArgs.map(eval(e, _)).cons(wf)) match {
-            case Vect(Eval, env: Dict, v) => eval(env, v)
+          case wf: WFunc => (rawArgs.map(eval(_, e)).cons(wf)) match {
+            case Vect(Eval, v, env: Dict) => eval(v, env)
             // type stuff
             case Vect(TypeEq, a: WType, b: WType) => a == b
             case Vect(TypeOf, a) => a match {
@@ -93,7 +89,7 @@ object Interpretter {
             case Vect(VectCons, vect: Vect, v) => vect.cons(v)
             case Vect(VectSlice, vect: Vect, from: Int, until: Int) => vect.slice(from, until)
             case Vect(VectNth, vect: Vect, index: Int) => vect(index)
-            case Vect(VectReduce, vect: Vect, func) => eval(e, vect.reduce((a, b) => Vect(func, a, b)))
+            case Vect(VectReduce, vect: Vect, func) => eval(vect.reduce((a, b) => Vect(func, a, b)), e) // TODO: probably broken?
             case Vect(DictContains, dict: Dict, k) => dict.contains(k)
             case Vect(DictGet, dict: Dict, k) => dict(k)
             case Vect(DictInsert, dict: Dict, k, v) => dict + (k -> v)
@@ -106,7 +102,7 @@ object Interpretter {
             case Vect(Error, msg: String) => sys.error("Code called an errror with msg: " + msg)
             case Trace +: args => println(args.mkString)
             case Vect(VectLength, vec: Vect) => vec.length
-            case n => "Unexpected arguments with: " + n
+            case x => sys.error("Unexpected arguments with: " + x)
           }
 
           case x => sys.error("When evaluating a vect, the first argument was an unexpected: " + x)
@@ -120,7 +116,7 @@ object Interpretter {
   object If
   object Vau
 
-  case class VauRun(capEnv: Dict, envS: Symbol, argS: Symbol, capCode: Any) {
+  case class VauRun(capEnv: Dict, argS: Symbol, envS: Symbol, capCode: Any) {
     override def toString = "$vau$"
   }
 
