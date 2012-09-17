@@ -30,11 +30,10 @@ Valid options are:
     } else {
       val path = Paths.get(rest.head)
 
-      val dag = loadAll(Dag[Path, Any](), path)
+      val dag = loadAll(Dag[Path, Any](), path, verbose)
 
-      if (verbose) {
+      if (verbose)
         println("File dependency graph:\n" + dag.toAscii)
-      }
 
       if (watch)
         runWatch(dag, verbose)
@@ -44,14 +43,17 @@ Valid options are:
     }
   }
 
-  def loadAll(current: Dag[Path, Any], path: Path): Dag[Path, Any] = {
+  def loadAll(current: Dag[Path, Any], path: Path, verbose: Boolean): Dag[Path, Any] = {
+
+    if (verbose)
+      println("Loading file: " + path)
 
     val (imports, value) = Reader(path)
 
     imports.foldLeft(current.add(path, value, imports)) {
       (a, b) =>
         if (!a.payload.contains(b))
-          loadAll(a, b)
+          loadAll(a, b, verbose)
         else
           a
     }
@@ -69,22 +71,44 @@ Valid options are:
         if (verbose)
           println("About to interpret file: " + path)
 
-        val (result, t) = timeFunc(Interpretter(form,env.asInstanceOf[Dict]))
+        val (result, t) = timeFunc(Interpretter(form, env.asInstanceOf[Dict]))
 
         if (verbose)
           println("..took " + t)
-          
+
         result
     }
-
+    if (verbose)
+      println("--------")
     println(r)
   }
 
   def runWatch(dag: Dag[Path, Any], verbose: Boolean) {
-    sys.error("Run Watch not yet supported")
+    val entry = dag.root
+
+    var d = dag
+
+    while (true) {
+      runDag(d, verbose)
+
+      println("\nWaiting on file changes...")
+      val changedPaths = blockOn(dag.payload.keys)
+
+      if (verbose)
+        println("Detected changed: " + changedPaths.mkString(", "))
+
+      val ancestors = for (p <- changedPaths) yield d.ancestors(p)
+      val all = ancestors.reduce(_ ++ _)
+
+      for (p <- all) {
+        d = d.remove(p)
+      }
+
+      d = loadAll(d, entry, verbose)
+    }
   }
 
-  def blockOn(watching: IndexedSeq[Path]): Unit = {
+  def blockOn(watching: Iterable[Path]): Iterable[Path] = {
 
     import java.nio.file.StandardWatchEventKinds._
     import java.nio.file.WatchEvent;
@@ -110,18 +134,16 @@ Valid options are:
 
       val watchable = wk.watchable().asInstanceOf[Path]
 
-      for (event <- wk.pollEvents()) {
+      val changed = for (context <- wk.pollEvents().map(event => watchable.resolve(event.context().asInstanceOf[Path])) if check.contains(context.toString()))
+        yield context
 
-        val context = watchable.resolve(event.context().asInstanceOf[Path])
+      if (changed.nonEmpty)
+        return changed.toList
 
-        if (check.contains(context.toString())) {
-          return
-        }
-
-      }
       wk.reset()
     }
 
+    null // please the type checker
   }
 
   def timeFunc[A](fn: => A) = {

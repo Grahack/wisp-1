@@ -76,6 +76,8 @@ class Dag[A, P](val direct: Map[A, Set[A]], val reverse: Map[A, Set[A]], val pay
     else
       L
   }
+  
+  def root: A = topologicalSort.head // TODO: this should be done a bit smarter...
 
   def toAscii = {
     import com.github.mdr.ascii.layout._
