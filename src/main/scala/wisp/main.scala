@@ -89,7 +89,11 @@ Valid options are:
     var d = dag
 
     while (true) {
-      runDag(d, verbose)
+      try {
+        runDag(d, verbose)
+      } catch {
+        case x: Throwable => println("Caught exception: " + x)
+      }
 
       println("\nWaiting on file changes...")
       val changedPaths = blockOn(dag.payload.keys)
