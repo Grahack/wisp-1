@@ -11,7 +11,7 @@ object Vect {
 }
 
 class Vect(val data: scalaz.IndSeq[Any]) extends Iterable[Any] {
-  
+
   def iterator = data.self.iterator
 
   def apply(index: Int) = data(index)
@@ -22,7 +22,7 @@ class Vect(val data: scalaz.IndSeq[Any]) extends Iterable[Any] {
   override def last: Any = data.self.last
   override def init: Vect = new Vect(data.init)
 
-  def +:(v: Any): Any = new Vect(v +: data)
+  def +:(v: Any) = new Vect(v +: data)
   def :+(v: Any) = new Vect(data :+ v)
 
   override def isEmpty = data.self.isEmpty
@@ -34,23 +34,21 @@ class Vect(val data: scalaz.IndSeq[Any]) extends Iterable[Any] {
   // don't expose to the interpretter:
 
   override def equals(x: Any): Boolean = {
+    x match {
+      case s: String => equals(s.toList)
+      case i: Iterable[_] =>
+        val aIt = iterator
+        val bIt = i.iterator
 
-    if (x.isInstanceOf[String]) {
-      return convertToString == Some(x)
+        while (aIt.hasNext && bIt.hasNext) {
+          if (aIt.next() != bIt.next()) return false;
+        }
+
+        aIt.hasNext == bIt.hasNext
+      case x => false
     }
-    
-    if (!x.isInstanceOf[Iterable[_]]) return false;
 
-    val aIt = iterator
-    val bIt = x.asInstanceOf[Iterable[_]].iterator
-
-    while (aIt.hasNext && bIt.hasNext) {
-      if (aIt.next() != bIt.next()) return false;
-    }
-
-    aIt.hasNext == bIt.hasNext
   }
-  
   def vmap(f: Any => Any) = new Vect(data.map(f))
 
   def convertToString: Option[String] = {
@@ -72,6 +70,8 @@ class Vect(val data: scalaz.IndSeq[Any]) extends Iterable[Any] {
 
     convertToString.getOrElse {
       val sb = StringBuilder.newBuilder
+
+      //if (headOption)
 
       sb += '['
       data.self.foreach { x =>

@@ -30,7 +30,7 @@ object Interpretter {
   def eval(form: Any, e: Dict): Any = {
 
     form match {
-      case s: Symbol => e(s)
+      case s: Symbol => eval(e(s), e)
       case f +: rawArgs => {
         eval(f, e) match {
           case VauRun(capEnv, argS, envS, capCode) => eval(capCode, capEnv + (argS -> rawArgs) + (envS -> e))
@@ -47,6 +47,10 @@ object Interpretter {
             val cond = eval(rawArgs(0), e)
             require(cond.isInstanceOf[Boolean], "Condition in #if statement, should evalute to a boolean -- but instead got: " + cond + ". If statement was: " + rawArgs)
             if (cond.asInstanceOf[Boolean]) eval(rawArgs(1), e) else eval(rawArgs(2), e)
+          }
+          case Quote => {
+            require(rawArgs.length == 1, "Quote should only be given a single argument. Got: " + rawArgs)
+            rawArgs.head
           }
           case wf: WFunc => (wf +: rawArgs.vmap(eval(_, e))) match {
             case Vect(Eval, v, env: Dict) => eval(v, env)
@@ -97,9 +101,6 @@ object Interpretter {
     }
   }
 
-  // Primitives
-  object If
-  object Vau
 
   case class VauRun(capEnv: Dict, argS: Symbol, envS: Symbol, capCode: Any) {
     override def toString = "$vau$"

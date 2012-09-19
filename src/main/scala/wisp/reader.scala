@@ -53,14 +53,15 @@ object Reader extends Parsers {
     if (t.length == 1)
       t.head
     else
-      Call(t.head, Vect.fromSeq(t.tail))
+      t.head +: Vect.fromSeq(t.tail)
   }
 
-  private def atomParser: Parser[Any] = (vectParser | intParser | quotedStringParser | symbolParser) ~
-    opt(callArgs) ^^ { x => if (x._2.isEmpty) x._1 else Call(x._1, Vect.fromSeq(x._2.get)) }
+  private def atomParser: Parser[Any] = vectParser | literalVectParser | intParser | quotedStringParser | symbolParser
 
-  private def callArgs: Parser[List[Any]] = '(' ~> repsep(atomParser, ' ') ~< ')'
-  private def vectParser: Parser[Vect] = '[' ~> repsep(atomParser, ' ') ~< ']' ^^ (x => Vect.fromSeq(x))
+  private def vectParser: Parser[Vect] = '(' ~> repsep(atomParser, ' ') ~< ')' ^^ (x => Vect.fromSeq(x))
+  private def literalVectParser: Parser[Vect] = '[' ~> repsep(atomParser, ' ') ~< ']' ^^ {
+    x => Quote +: Vect.fromSeq(x)
+  }
 
   // TODO: allow arbitrary base
   private def intParser = rep1(digitParser) ^^ (x => numberListToNumber(x, base = 10))

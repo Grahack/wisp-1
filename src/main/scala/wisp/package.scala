@@ -8,7 +8,13 @@ package object wisp {
     lines
   }
 
-  import scalaz._
-
+    
+  // Primitives
+  object If
+  object Vau
+  
+  // Quote can trivially written as (#vau a _ (#vect-nth a 0)) but it seems a little nicer
+  // having the reader emit this
+  object Quote
 
 }

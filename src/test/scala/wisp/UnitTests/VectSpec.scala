@@ -23,6 +23,20 @@ class VectSpec extends Specification {
     "Convert to a string" in {
       Vect.fromSeq("Dinner is delicious".toList) == "Dinner is delicious"
     }
+    
+    "Getting a tail" in {
+      
+      val ft = Vect(-1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11).data.self
+      
+      println("ft size: " + ft.iterator.size)
+      ft.pp
+      
+      ft.viewl.tail.pp
+      
+      ok
+      
+    }
+    
   }
 
 }
