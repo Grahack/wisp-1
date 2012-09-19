@@ -14,33 +14,34 @@ class ReaderSpec extends Specification {
   }
 
   "The Reader" should {
+
+    "actually able to load a real file" in {
+      /* Writes the string to disk, then uses the reader to load it */
+
+      import java.nio.file.Files
+      val path = Files.createTempFile("wisp_reader_test", ".wisp")
+      val stream = Files.newBufferedWriter(path, Charset.forName("UTF-8"))
+      stream.write("434")
+      stream.close()
+
+      Reader(path)._2 must_== 434
+    }
+
     "be able to read a number" in {
-      read("44")._2 must_== 44
+      Reader("44")._2 must_== 44
     }
     "be able to read a symbol" in {
-      read("cat")._2 must_== 'cat
+      Reader("cat")._2 must_== 'cat
     }
     "be able to read a string" in {
-      read("\"a string\"")._2 str_== "a string"
+      Reader("\"a string\"")._2 str_== "a string"
     }
     "read vectors" in {
-      read("[a b c d]")._2 must_== Vect('a, 'b, 'c, 'd)
+      Reader("[a b c d]")._2 must_== Vect('a, 'b, 'c, 'd)
     }
     "handle top level function calls" in {
-      read("func arg1 arg2")._2 must_== Call('func, Vect('arg1, 'arg2))
+      Reader("func arg1 arg2")._2 must_== Call('func, Vect('arg1, 'arg2))
     }
   }
 
-  /* Writes the string to disk, then uses the reader to load it */
-  def read(s: String) = {
-    import java.nio.file.Files
-
-    val path = Files.createTempFile("wisp_reader_test", ".wisp")
-
-    val stream = Files.newBufferedWriter(path, Charset.forName("UTF-8"))
-    stream.write(s)
-    stream.close()
-
-    Reader(path)
-  }
 }

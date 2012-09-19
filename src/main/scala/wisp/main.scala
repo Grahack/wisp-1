@@ -50,8 +50,10 @@ Valid options are:
       println("Loading file: " + path)
 
     val (imports, value) = Reader(path)
+    
+    val importPaths = imports.map(path.resolveSibling(_)).toSet // TODO: check for dupes ?
 
-    imports.foldLeft(current.add(path, value, imports)) {
+    importPaths.foldLeft(current.add(path, value, importPaths)) {
       (a, b) =>
         if (!a.payload.contains(b))
           loadAll(a, b, verbose)

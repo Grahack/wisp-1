@@ -9,11 +9,11 @@ object Reader extends Parsers {
 
   type Elem = Char
 
-  def apply(path: Path): (Set[Path], Any) = {
-    
+  def apply(path: Path): (Seq[String], Any) = apply(new String(Files.readAllBytes(path)))
 
+  def apply(contents: String): (Seq[String], Any) = {
 
-    val csr = new CharSequenceReader(new String(Files.readAllBytes(path)))
+    val csr = new CharSequenceReader(contents)
 
     val p = rep((atomListParser(0)) <~ rep(eol))(csr)
 
@@ -31,13 +31,13 @@ object Reader extends Parsers {
       case Some('import +: paths) =>
         require(forms.length == 2, "A top level with an import, must only have two forms")
 
-        val imports = paths.data.map(x => path.resolveSibling(x.asInstanceOf[String]))
+        val imports = paths.data.map(_.asInstanceOf[String])
 
-        (imports.self.toList.toSet -> forms.last)
+        (imports.self.toList -> forms.last)
 
       case _ =>
         require(forms.length == 1, "A top level with an import, must only have a single form")
-        (Set() -> forms.head)
+        (Seq() -> forms.head)
     }
   }
 
