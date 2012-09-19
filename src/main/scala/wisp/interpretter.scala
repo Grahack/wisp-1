@@ -9,7 +9,7 @@ object Interpretter {
 
   object WTypes extends Enumeration {
     type WType = Value
-    val TypeBool, TypeSym, TypeNum, TypeDict, TypeStr, TypeVect, TypeType = Value
+    val TypeBool, TypeSym, TypeNum, TypeDict, TypeVect, TypeType = Value
   }
   import WTypes._
 
@@ -18,9 +18,8 @@ object Interpretter {
 
     val Eval = Value // primitive (ish)
     val TypeEq, TypeOf = Value
-    val NumAdd, NumDiv, NumGreaterThan, NumGreaterThanOrEqual, NumEq, NumNeq, NumLessThan, NumLessThanOrEqual, NumMult, NumSub, NumToString = Value
-    val StrCharAt, StrConcat, StrEq, StrIndexOf, StrLastIndexOf, StrLength, StrSlice, StrSplit, StrToSym, StrToVect = Value
-    val SymToString, SymEq = Value
+    val NumAdd, NumDiv, NumGreaterThan, NumGreaterThanOrEqual, NumEq, NumNeq, NumLessThan, NumLessThanOrEqual, NumMult, NumSub, NumToVect = Value
+    val SymEq, SymToVect = Value
     val VectAppend, VectCons, VectLength, VectNth, VectReduce, VectSlice = Value
     val DictContains, DictGet, DictInsert, DictRemove, DictSize, DictToVect = Value
     val BoolNot, BoolEq = Value
@@ -49,14 +48,13 @@ object Interpretter {
             require(cond.isInstanceOf[Boolean], "Condition in #if statement, should evalute to a boolean -- but instead got: " + cond + ". If statement was: " + rawArgs)
             if (cond.asInstanceOf[Boolean]) eval(rawArgs(1), e) else eval(rawArgs(2), e)
           }
-          case wf: WFunc => (wf +: rawArgs.map(eval(_, e))) match {
+          case wf: WFunc => (wf +: rawArgs.vmap(eval(_, e))) match {
             case Vect(Eval, v, env: Dict) => eval(v, env)
             // type stuff
             case Vect(TypeEq, a: WType, b: WType) => a == b
             case Vect(TypeOf, a) => a match {
               case _: Boolean => TypeBool
               case _: Int => TypeNum
-              case _: String => TypeStr
               case _: Symbol => TypeSym
               case _: Vect => TypeVect
               case _: Dict => TypeDict
@@ -72,7 +70,7 @@ object Interpretter {
             case Vect(NumLessThanOrEqual, a: Int, b: Int) => a <= b
             case Vect(NumMult, a: Int, b: Int) => a * b
             case Vect(NumSub, a: Int, b: Int) => a - b
-            case Vect(NumToString, a: Int) => a.toString()
+            case Vect(NumToVect, a: Int) => Vect.fromSeq(a.toString().toSeq)
             case Vect(SymEq, a: Symbol, b: Symbol) => a == b
             case Vect(VectAppend, vect: Vect, v) => vect :+ v
             case Vect(VectCons, vect: Vect, v) => v +: vect
@@ -86,7 +84,7 @@ object Interpretter {
             case Vect(BoolNot, arg: Boolean) => !arg
             case Vect(BoolEq, a: Boolean, b: Boolean) => a == b
             case Vect(Error) => sys.error("Code called an error")
-            case Vect(Error, msg: String) => sys.error("Code called an errror with msg: " + msg)
+            case Vect(Error, msg) => sys.error("Code called an errror with msg: " + msg)
             case Trace +: args => println(args)
             case Vect(VectLength, vec: Vect) => vec.length
             case x => sys.error("Unexpected arguments with: " + x)
@@ -116,7 +114,6 @@ object Interpretter {
     (Symbol("#Bool") -> TypeBool) +
     (Symbol("#Dict") -> TypeDict) +
     (Symbol("#Num") -> TypeNum) +
-    (Symbol("#Str") -> TypeStr) +
     (Symbol("#Sym") -> TypeSym) +
     (Symbol("#Type") -> TypeType) +
     (Symbol("#type-eq") -> TypeEq) +
@@ -133,21 +130,10 @@ object Interpretter {
     (Symbol("#num-mult") -> NumMult) +
     (Symbol("#num-neq") -> NumNeq) +
     (Symbol("#num-sub") -> NumSub) +
-    (Symbol("#num-to-str") -> NumToString) +
-    // string stuff
-    (Symbol("#str-chat-at") -> StrCharAt) +
-    (Symbol("#str-concat") -> StrConcat) +
-    (Symbol("#str-eq") -> StrEq) +
-    (Symbol("#str-index-of") -> StrIndexOf) +
-    (Symbol("#str-last-index-of") -> StrLastIndexOf) +
-    (Symbol("#str-length") -> StrLength) +
-    (Symbol("#str-slice") -> StrSlice) +
-    (Symbol("#str-split") -> StrSplit) +
-    (Symbol("#str-to-sym") -> StrToSym) +
-    (Symbol("#str-to-vect") -> StrToVect) +
+    (Symbol("#num-to-str") -> NumToVect) +
     // sym stuff
-    (Symbol("#sym-to-string") -> SymToString) +
     (Symbol("#sym-eq") -> SymEq) +
+    (Symbol("#sym-to-vect") -> SymToVect) +
     // vect functions
     (Symbol("#vect-append") -> VectAppend) +
     (Symbol("#vect-cons") -> VectCons) +

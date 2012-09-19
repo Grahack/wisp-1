@@ -10,23 +10,24 @@ object Vect {
   def unapplySeq(x: Vect) = List.unapplySeq(x.data.self.toList) // TODO: a fast way?
 }
 
-class Vect(val data: scalaz.IndSeq[Any]) {
+class Vect(val data: scalaz.IndSeq[Any]) extends Iterable[Any] {
+  
+  def iterator = data.self.iterator
 
   def apply(index: Int) = data(index)
   def ++(other: Vect) = new Vect(data ++ other.data)
 
-  def head: Any = data.self.head
-  def tail: Vect = new Vect(data.tail)
-  def last: Any = data.self.last
-  def init: Vect = new Vect(data.init)
+  override def head: Any = data.self.head
+  override def tail: Vect = new Vect(data.tail)
+  override def last: Any = data.self.last
+  override def init: Vect = new Vect(data.init)
 
   def +:(v: Any): Any = new Vect(v +: data)
   def :+(v: Any) = new Vect(data :+ v)
 
-  def isEmpty = data.self.isEmpty
-  def nonEmpty = !isEmpty
+  override def isEmpty = data.self.isEmpty
 
-  def length = data.self.measure // TODO: check if this is correct?
+  def length = data.self.measure
 
   // def reduce(op: (Any, Any) => Any) = data.reduce(op)
 
@@ -34,10 +35,14 @@ class Vect(val data: scalaz.IndSeq[Any]) {
 
   override def equals(x: Any): Boolean = {
 
-    if (!x.isInstanceOf[Vect]) return false;
+    if (x.isInstanceOf[String]) {
+      return convertToString == Some(x)
+    }
+    
+    if (!x.isInstanceOf[Iterable[_]]) return false;
 
-    val aIt = data.self.iterator
-    val bIt = x.asInstanceOf[Vect].data.self.iterator
+    val aIt = iterator
+    val bIt = x.asInstanceOf[Iterable[_]].iterator
 
     while (aIt.hasNext && bIt.hasNext) {
       if (aIt.next() != bIt.next()) return false;
@@ -45,10 +50,8 @@ class Vect(val data: scalaz.IndSeq[Any]) {
 
     aIt.hasNext == bIt.hasNext
   }
-
-  def map(f: Any => Any) = new Vect(data.map(f))
-
-  def foreach(f: Any => Unit) = data.self.foreach(f)
+  
+  def vmap(f: Any => Any) = new Vect(data.map(f))
 
   def convertToString: Option[String] = {
 
@@ -65,18 +68,17 @@ class Vect(val data: scalaz.IndSeq[Any]) {
     Some(sb.toString)
   }
 
-  override def toString() = {
-    val sb = StringBuilder.newBuilder
+  override def toString() =
 
-    sb += '['
+    convertToString.getOrElse {
+      val sb = StringBuilder.newBuilder
 
-    data.self.foreach { x =>
-      sb ++= x.toString
+      sb += '['
+      data.self.foreach { x =>
+        sb ++= x.toString
+      }
+      sb += ']'
+
+      sb.toString
     }
-
-    sb += ']'
-
-    sb.toString
-  }
-
 }

@@ -57,8 +57,9 @@ object Reader extends Parsers {
   }
 
   private def atomParser: Parser[Any] = (vectParser | intParser | quotedStringParser | symbolParser) ~
-    opt('(' ~> repsep(atomParser, ' ') ~< ')') ^^ { x => if (x._2.isEmpty) x._1 else Call(x._1, Vect.fromSeq(x._2.get)) }
+    opt(callArgs) ^^ { x => if (x._2.isEmpty) x._1 else Call(x._1, Vect.fromSeq(x._2.get)) }
 
+  private def callArgs: Parser[List[Any]] = '(' ~> repsep(atomParser, ' ') ~< ')'
   private def vectParser: Parser[Vect] = '[' ~> repsep(atomParser, ' ') ~< ']' ^^ (x => Vect.fromSeq(x))
 
   // TODO: allow arbitrary base
