@@ -9,10 +9,10 @@ object Dict {
 class Dict(val data: scala.collection.immutable.HashMap[Any, Any]) {
 
   def +(elem: (Any, Any)): Dict = {
-    require(!data.contains(elem._1), "Could not add: " + elem  + " to dict, as key already exists (with value: " + data(elem._1) + ")")
+    require(!data.contains(elem._1), "Could not add: " + elem + " to dict, as key already exists (with value: " + data(elem._1) + ")")
     new Dict(data + elem)
   }
-  
+
   def -(key: Any): Dict = {
     require(data.contains(key))
     new Dict(data - key)
@@ -22,8 +22,8 @@ class Dict(val data: scala.collection.immutable.HashMap[Any, Any]) {
     // TODO: some smart checking or something
     new Dict(data ++ r.data)
   }
-  
-  def foreach(f: ((Any,Any)) => Unit) = data.foreach(f)
+
+  def foreach(f: ((Any, Any)) => Unit) = data.foreach(f)
 
   def contains(k: Any) = data.contains(k)
 
@@ -32,6 +32,6 @@ class Dict(val data: scala.collection.immutable.HashMap[Any, Any]) {
   def get(k: Any) = data.get(k)
 
   def size = data.size
-  
+
   override def toString = "{Dict. size: " + size + " }"
 }

@@ -29,6 +29,7 @@ Valid options are:
             awesome ascii-art dependency graphs. """)
     } else {
       val path = Paths.get(rest.head)
+      
 
       val dag = loadAll(Dag[Path, Any](), path, verbose)
 

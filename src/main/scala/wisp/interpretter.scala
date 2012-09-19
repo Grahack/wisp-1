@@ -49,7 +49,7 @@ object Interpretter {
             require(cond.isInstanceOf[Boolean], "Condition in #if statement, should evalute to a boolean -- but instead got: " + cond + ". If statement was: " + rawArgs)
             if (cond.asInstanceOf[Boolean]) eval(rawArgs(1), e) else eval(rawArgs(2), e)
           }
-          case wf: WFunc => (rawArgs.map(eval(_, e)).cons(wf)) match {
+          case wf: WFunc => (wf +: rawArgs.map(eval(_, e))) match {
             case Vect(Eval, v, env: Dict) => eval(v, env)
             // type stuff
             case Vect(TypeEq, a: WType, b: WType) => a == b
@@ -73,34 +73,21 @@ object Interpretter {
             case Vect(NumMult, a: Int, b: Int) => a * b
             case Vect(NumSub, a: Int, b: Int) => a - b
             case Vect(NumToString, a: Int) => a.toString()
-            case Vect(StrCharAt, str: String, at: Int) => str.charAt(at).toString
-            case Vect(StrConcat, a: String, b: String) => a + b
-            case Vect(StrEq, a: String, b: String) => a == b
-            case Vect(StrIndexOf, str: String, search: String, startIndex: Int) => str.indexOf(search, startIndex)
-            case Vect(StrLastIndexOf, str: String, search: String, lastIndex: Int) => str.lastIndexOf(search, lastIndex)
-            case Vect(StrLength, str: String) => str.length
-            case Vect(StrSlice, str: String, from: Int, until: Int) => str.slice(from, until)
-            case Vect(StrSplit, str: String, using: String) => Vect(str.split(using): _*) // TODO: careful, is this using regex?
-            case Vect(StrToSym, str: String) => Symbol(str)
-            case Vect(StrToVect, str: String) => Vect(str.toCharArray().map(x => x.toString): _*)
-            case Vect(SymToString, sym: Symbol) => sym.name
             case Vect(SymEq, a: Symbol, b: Symbol) => a == b
-            case Vect(VectAppend, vect: Vect, v) => vect.append(v)
-            case Vect(VectCons, vect: Vect, v) => vect.cons(v)
-            case Vect(VectSlice, vect: Vect, from: Int, until: Int) => vect.slice(from, until)
+            case Vect(VectAppend, vect: Vect, v) => vect :+ v
+            case Vect(VectCons, vect: Vect, v) => v +: vect
             case Vect(VectNth, vect: Vect, index: Int) => vect(index)
-            case Vect(VectReduce, vect: Vect, func) => eval(vect.reduce((a, b) => Vect(func, a, b)), e) // TODO: probably broken?
             case Vect(DictContains, dict: Dict, k) => dict.contains(k)
             case Vect(DictGet, dict: Dict, k) => dict(k)
             case Vect(DictInsert, dict: Dict, k, v) => dict + (k -> v)
             case Vect(DictRemove, dict: Dict, k) => dict - k
             case Vect(DictSize, dict: Dict) => dict.size
-            case Vect(DictToVect, a: Dict) => a.data.foldLeft(Vect()) { (p, n) => p.append(n) }
+            case Vect(DictToVect, a: Dict) => Vect.fromSeq(a.data.toSeq) //foldLeft(Vect()) { (p, n) => p.append(n) }
             case Vect(BoolNot, arg: Boolean) => !arg
             case Vect(BoolEq, a: Boolean, b: Boolean) => a == b
             case Vect(Error) => sys.error("Code called an error")
             case Vect(Error, msg: String) => sys.error("Code called an errror with msg: " + msg)
-            case Trace +: args => println(args.mkString)
+            case Trace +: args => println(args)
             case Vect(VectLength, vec: Vect) => vec.length
             case x => sys.error("Unexpected arguments with: " + x)
           }

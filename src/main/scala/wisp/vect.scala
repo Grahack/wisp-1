@@ -1,57 +1,82 @@
 package wisp
 
 object +: {
-  def unapply(t: Vect): Option[(Any, Vect)] = t.headOption map (h => h -> t.tail)
+  def unapply(t: Vect): Option[(Any, Vect)] = if (t.isEmpty) None else Some(t.head -> t.tail)
 }
 
 object Vect {
-  def apply(values: Any*) = new Vect(Vector(values: _*))  
-  def unapplySeq(x: Vect) = Vector.unapplySeq(x.data) //.map(new Vect(_))
+  def apply(values: Any*) = new Vect(scalaz.IndSeq(values: _*))
+  def fromSeq(values: Seq[Any]) = new Vect(scalaz.IndSeq.fromSeq(values))
+  def unapplySeq(x: Vect) = List.unapplySeq(x.data.self.toList) // TODO: a fast way?
 }
 
-class Vect(val data: Vector[Any]) {
+class Vect(val data: scalaz.IndSeq[Any]) {
 
   def apply(index: Int) = data(index)
+  def ++(other: Vect) = new Vect(data ++ other.data)
 
-  def concat(other: Vect) = new Vect(data ++ other.data)
+  def head: Any = data.self.head
+  def tail: Vect = new Vect(data.tail)
+  def last: Any = data.self.last
+  def init: Vect = new Vect(data.init)
 
-  def last: Any = data.last
-  def head: Any = data.head
+  def +:(v: Any): Any = new Vect(v +: data)
+  def :+(v: Any) = new Vect(data :+ v)
 
-  def cons(v: Any): Any = new Vect(v +: data)
-  def append(v: Any) = new Vect(data :+ v)
+  def isEmpty = data.self.isEmpty
+  def nonEmpty = !isEmpty
 
-  def slice(from: Int, until: Int) = new Vect(data.slice(from, until))
-  
-  def reverse = new Vect(data.reverse)
+  def length = data.self.measure // TODO: check if this is correct?
 
-  def isEmpty = data.isEmpty
-  def nonEmpty = data.nonEmpty
-  def length = data.length
-  
-  def reduce(op: (Any, Any) => Any) = data.reduce(op)
+  // def reduce(op: (Any, Any) => Any) = data.reduce(op)
 
   // don't expose to the interpretter:
 
-  def span(p: Any => Boolean): (Vect, Vect) = {
-    val r = data.span(p)
-    (new Vect(r._1), new Vect(r._2))
-  }
+  override def equals(x: Any): Boolean = {
 
-  def partition(p: Any => Boolean): (Vect, Vect) = {
-    val r = data.partition(p)
-    (new Vect(r._1), new Vect(r._2))
+    if (!x.isInstanceOf[Vect]) return false;
+
+    val aIt = data.self.iterator
+    val bIt = x.asInstanceOf[Vect].data.self.iterator
+
+    while (aIt.hasNext && bIt.hasNext) {
+      if (aIt.next() != bIt.next()) return false;
+    }
+
+    aIt.hasNext == bIt.hasNext
   }
 
   def map(f: Any => Any) = new Vect(data.map(f))
-  
-  def foreach(f: Any => Unit) = data.foreach(f)
 
-  def headOption = data.headOption
-  def tail = new Vect(data.tail)
-  
-  def mkString = data.mkString
-  
-  override def toString() = data.toString()
+  def foreach(f: Any => Unit) = data.self.foreach(f)
+
+  def convertToString: Option[String] = {
+
+    val sb = StringBuilder.newBuilder
+
+    data.self.foreach {
+      c =>
+        if (c.isInstanceOf[Char])
+          sb += c.asInstanceOf[Char]
+        else
+          return None
+    }
+
+    Some(sb.toString)
+  }
+
+  override def toString() = {
+    val sb = StringBuilder.newBuilder
+
+    sb += '['
+
+    data.self.foreach { x =>
+      sb ++= x.toString
+    }
+
+    sb += ']'
+
+    sb.toString
+  }
 
 }

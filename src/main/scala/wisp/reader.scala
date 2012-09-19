@@ -10,10 +10,12 @@ object Reader extends Parsers {
   type Elem = Char
 
   def apply(path: Path): (Set[Path], Any) = {
+    
+
 
     val csr = new CharSequenceReader(new String(Files.readAllBytes(path)))
 
-    val p = vrep((atomListParser(0)) <~ rep(eol))(csr)
+    val p = rep((atomListParser(0)) <~ rep(eol))(csr)
 
     val forms = p match {
       case Success(res, next) => {
@@ -31,7 +33,7 @@ object Reader extends Parsers {
 
         val imports = paths.data.map(x => path.resolveSibling(x.asInstanceOf[String]))
 
-        (imports.toSet -> forms.last)
+        (imports.self.toList.toSet -> forms.last)
 
       case _ =>
         require(forms.length == 1, "A top level with an import, must only have a single form")
@@ -39,29 +41,25 @@ object Reader extends Parsers {
     }
   }
 
-
   private def atomListParser(depth: Int): Parser[Any] =
     rep(eol) ~>
       repN(depth, '\t') ~>
-      vrep1sep(atomParser, rep(' ')) ~< rep(' ') ~
-      vrep(eol ~> atomListParser(depth + 1)) ^^ (x => stitch(x._1, x._2))
+      rep1sep(atomParser, ' ') ~
+      rep(eol ~> atomListParser(depth + 1)) ^^ (x => stitch(x._1, x._2))
 
-  private def stitch(a: Vect, b: Vect) = {
-    val t = (a concat b)
+  private def stitch(a: List[Any], b: List[Any]) = {
+    val t = (a ++ b)
 
     if (t.length == 1)
       t.head
     else
-      t
+      Call(t.head, Vect.fromSeq(t.tail))
   }
 
-  private def vrep(p: => Parser[Any]): Parser[Vect] = rep(p) ^^ (Vect(_: _*))
-  private def vrepsep(p: => Parser[Any], q: => Parser[Any]): Parser[Vect] = repsep(p, q) ^^ (Vect(_: _*))
-  private def vrep1sep(p: => Parser[Any], q: => Parser[Any]): Parser[Vect] = rep1sep(p, q) ^^ (Vect(_: _*))
+  private def atomParser: Parser[Any] = (vectParser | intParser | quotedStringParser | symbolParser) ~
+    opt('(' ~> repsep(atomParser, ' ') ~< ')') ^^ { x => if (x._2.isEmpty) x._1 else Call(x._1, Vect.fromSeq(x._2.get)) }
 
-  private def atomParser = vectParser | intParser | quotedStringParser | symbolParser
-
-  private def vectParser: Parser[Vect] = '(' ~> rep(' ') ~> vrepsep(atomParser, rep(' ')) ~< rep(' ') ~< ')'
+  private def vectParser: Parser[Vect] = '[' ~> repsep(atomParser, ' ') ~< ']' ^^ (x => Vect.fromSeq(x))
 
   // TODO: allow arbitrary base
   private def intParser = rep1(digitParser) ^^ (x => numberListToNumber(x, base = 10))
@@ -71,13 +69,12 @@ object Reader extends Parsers {
 
   private def symbolParser = rep1(
     acceptIf(c =>
-      !c.isWhitespace &&
-        !c.isControl &&
-        c != ')' &&
-        c != '(' &&
-        c != '"')(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ charListToSymbol
+      !c.isWhitespace && !c.isControl
+        && c != '(' && c != ')'
+        && c != '[' && c != ']'
+        && c != ';' && c != '"')(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ charListToSymbol
 
-  private def quotedStringParser = '"' ~> rep(insideQuoteParser) ~< '"' ^^ charListToString
+  private def quotedStringParser = '"' ~> rep(insideQuoteParser) ~< '"' ^^ charListToVect
 
   // TODO: allow string escaping
   private def insideQuoteParser = acceptIf(c => c != '"' && c != '\n' && c != '\\')(c => "Unexpected '" + c + "' when parsing inside quote")
@@ -85,8 +82,8 @@ object Reader extends Parsers {
   private def numberListToNumber(nums: List[Int], base: Int) =
     nums.foldLeft(0) { (acc: Int, value: Int) => acc * base + value }
 
-  private def charListToString(letters: List[Char]) = new String(letters.toArray)
-  private def charListToSymbol(letters: List[Char]) = Symbol(charListToString(letters))
+  private def charListToVect(letters: List[Char]) = Vect.fromSeq(letters)
+  private def charListToSymbol(letters: List[Char]) = Symbol(new String(letters.toArray))
 
   private def eol = elem('\n') // TODO: support windows, but give warnin'
 

@@ -1,3 +1,4 @@
+import scalaz.FingerTree
 package object wisp {
 
   def load(file: String) = {
@@ -6,5 +7,8 @@ package object wisp {
     source.close()
     lines
   }
+
+  import scalaz._
+
 
 }
