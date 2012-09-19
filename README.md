@@ -13,6 +13,7 @@ Wisp is a whitespace lisp. It is designed to be extremely powerful and flexible,
 Status
 ======
 
+  * [![Build Status](https://secure.travis-ci.org/espringe/wisp.png)](http://travis-ci.org/espringe/wisp)
   * Language fundamentals **Done**
   * Simple interpretter **Done**
   * Core library **In progress**
@@ -60,4 +61,7 @@ Documentation
 ====
 
 Barely, but look in the `docs/` directory
+
+
+
 
