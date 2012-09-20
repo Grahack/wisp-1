@@ -52,7 +52,7 @@ object Interpretter {
             require(rawArgs.length == 1, "Quote should only be given a single argument. Got: " + rawArgs)
             rawArgs.head
           }
-          case wf: WFunc => (wf +: rawArgs.vmap(eval(_, e))) match {
+          case wf: WFunc => (wf +: rawArgs.map(eval(_, e))) match {
             case Vect(Eval, v, env: Dict) => eval(v, env)
             // type stuff
             case Vect(TypeEq, a: WType, b: WType) => a == b

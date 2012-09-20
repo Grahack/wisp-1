@@ -3,8 +3,8 @@ package wisp.unit_tests
 import org.specs2.mutable._
 import wisp._
 
-
 class ReaderSpec extends Specification {
+  sequential
 
   "The Reader" should {
 
@@ -29,26 +29,29 @@ class ReaderSpec extends Specification {
       Reader("cat")._2 must_== 'cat
     }
     "be able to read a string" in {
-     // (Vect(1, 2, 3).asInstanceOf[Anyy) must_== Vect(1, 2, 3)
-      ok
+      Reader("\"soup\"")._2 must_== Vect(Quote, 's', 'o', 'u', 'p')
+    }
+    "can read chars" in {
+      Reader("~q")._2 must_== 'q'
+
+      Reader("~a ~b ~c ~d ~e ~f")._2 must_== Vect('a', 'b', 'c', 'd', 'e', 'f')
     }
     "read vectors" in {
       Reader("[a b c d]")._2 == Vect(Quote, 'a, 'b, 'c, 'd)
+    }
+    "work with quoted symbols" in {
+      Reader("'robin")._2 == Vector(Quote, 'robin)
+
+      val r = Reader("'robin")._2 == Vector(Quote, 'robin)
+      r.pp
+      ok
+      // r
     }
     "handle top level function calls" in {
       Reader("func arg1 12 arg2")._2 must_== Vect('func, 'arg1, 12, 'arg2)
     }
     "explicit function appliction" in {
-      
-      val v = Reader("(func arg1 \"cat\")")._2
-      val r = Vect('func, 'arg1, "cat")
-      
-      v.getClass.toString().pp
-      r.getClass.toString().pp
-      
-      (v == r).toString.pp
-      
-      v must_== r
+      Reader("""(func 65 arg1 44)""")._2 must_== Vect('func, 65, 'arg1, 44)
     }
   }
 

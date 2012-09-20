@@ -1,4 +1,3 @@
-import scalaz.FingerTree
 package object wisp {
 
   def load(file: String) = {
@@ -16,5 +15,4 @@ package object wisp {
   // Quote can trivially written as (#vau a _ (#vect-nth a 0)) but it seems a little nicer
   // having the reader emit this
   object Quote
-
 }

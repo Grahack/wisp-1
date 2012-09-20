@@ -15,7 +15,7 @@ object Reader extends Parsers {
 
     val csr = new CharSequenceReader(contents)
 
-    val p = rep((atomListParser(0)) <~ rep(eol))(csr)
+    val p = (rep((atomListParser(0)) <~ rep(eol)) ~< eof)(csr)
 
     val forms = p match {
       case Success(res, next) => {
@@ -33,13 +33,15 @@ object Reader extends Parsers {
 
         val imports = paths.data.map(_.asInstanceOf[String])
 
-        (imports.self.toList -> forms.last)
+        (imports -> forms.last)
 
       case _ =>
         require(forms.length == 1, "A top level with an import, must only have a single form")
         (Seq() -> forms.head)
     }
   }
+
+  private def eof = acceptIf(_.toInt == 26)(_ => "Expected eof") // wtf is 26?
 
   private def atomListParser(depth: Int): Parser[Any] =
     rep(eol) ~>
@@ -56,8 +58,11 @@ object Reader extends Parsers {
       t.head +: Vect.fromSeq(t.tail)
   }
 
-  private def atomParser: Parser[Any] = vectParser | literalVectParser | intParser | quotedStringParser | symbolParser
-
+  private def atomParser: Parser[Any] =
+    charParser | vectParser | literalVectParser | intParser | literalStringParser | symbolParser | quoteParser
+  
+    private def charParser: Parser[Char] = '~' ~> acceptIf(!special(_))(_ => "expected char")
+  private def quoteParser: Parser[Vect] = '\'' ~> atomParser ^^ (x => Quote +: x +: Vect())
   private def vectParser: Parser[Vect] = '(' ~> repsep(atomParser, ' ') ~< ')' ^^ (x => Vect.fromSeq(x))
   private def literalVectParser: Parser[Vect] = '[' ~> repsep(atomParser, ' ') ~< ']' ^^ {
     x => Quote +: Vect.fromSeq(x)
@@ -70,21 +75,24 @@ object Reader extends Parsers {
     acceptIf(c => c.isDigit)(c => "Unexpected '" + c + "' when looking for a digit") ^^ (q => q.asDigit)
 
   private def symbolParser = rep1(
-    acceptIf(c =>
-      !c.isWhitespace && !c.isControl
-        && c != '(' && c != ')'
-        && c != '[' && c != ']'
-        && c != ';' && c != '"')(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ charListToSymbol
+    acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ charListToSymbol
 
-  private def quotedStringParser = '"' ~> rep(insideQuoteParser) ~< '"' ^^ charListToVect
+  private def special(c: Char) =
+    c.isWhitespace || c.isControl ||
+      c == '(' || c == ')' ||
+      c == '[' || c == ']' ||
+      c == '~' || c == '"' ||
+      c == ';'
+
+  private def literalStringParser = '"' ~> rep(insideLiteralParser) ~< '"' ^^ charListToVect
 
   // TODO: allow string escaping
-  private def insideQuoteParser = acceptIf(c => c != '"' && c != '\n' && c != '\\')(c => "Unexpected '" + c + "' when parsing inside quote")
+  private def insideLiteralParser = acceptIf(c => c != '"' && c != '\n' && c != '\\')(c => "Unexpected '" + c + "' when parsing inside quote")
 
   private def numberListToNumber(nums: List[Int], base: Int) =
     nums.foldLeft(0) { (acc: Int, value: Int) => acc * base + value }
 
-  private def charListToVect(letters: List[Char]) = Vect.fromSeq(letters)
+  private def charListToVect(letters: List[Char]) = Quote +: Vect.fromSeq(letters)
   private def charListToSymbol(letters: List[Char]) = Symbol(new String(letters.toArray))
 
   private def eol = elem('\n') // TODO: support windows, but give warnin'
