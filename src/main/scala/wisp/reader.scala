@@ -29,50 +29,50 @@ object Reader extends Parsers {
 
     forms.headOption match {
       case Some('import +: paths) =>
-        require(forms.length == 2, "A top level with an import, must only have two forms")
+        require(forms.length == 2, "A file with an import, must only have two forms")
 
         val imports = paths.data.map(_.asInstanceOf[String])
 
         (imports -> forms.last)
 
       case _ =>
-        require(forms.length == 1, "A top level with an import, must only have a single form")
+        require(forms.length == 1, "A file without an import, must only have a single form. Found: " + forms)
         (Seq() -> forms.head)
     }
   }
 
-  private def eof = acceptIf(_.toInt == 26)(_ => "Expected eof") // wtf is 26?
+  private def eof = acceptIf(_.toInt == 26)(c => "Expected eof, but found: '" + c + "' (" + c.toInt + ") instead") // wtf is 26?
 
   private def atomListParser(depth: Int): Parser[Any] =
-    rep(eol) ~>
+    rep(blankLine) ~>
       repN(depth, '\t') ~>
-      rep1sep(atomParser, ' ') ~
-      rep(eol ~> atomListParser(depth + 1)) ^^ (x => stitch(x._1, x._2))
+      rep1sep(atomParser, singleSpace) ~ 
+      rep(atomListParser(depth + 1)) ^^ (x => stitch(x._1, x._2))
 
-  private def stitch(a: List[Any], b: List[Any]) = {
-    val t = (a ++ b)
-
-    if (t.length == 1)
-      t.head
+  private def stitch(a: Seq[Any], b: Seq[Any]) = {
+    assert(a.length >= 1)
+    if (a.length == 1 && b.length == 0)
+      a.head
     else
-      t.head +: Vect.fromSeq(t.tail)
+      Vect.fromSeq(a ++ b)
   }
+      
+  private def comment = ';' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
+  private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
 
   private def atomParser: Parser[Any] =
-    charParser | vectParser | literalVectParser | intParser | literalStringParser | symbolParser | quoteParser
-  
-    private def charParser: Parser[Char] = '~' ~> acceptIf(!special(_))(_ => "expected char")
-  private def quoteParser: Parser[Vect] = '\'' ~> atomParser ^^ (x => Quote +: x +: Vect())
-  private def vectParser: Parser[Vect] = '(' ~> repsep(atomParser, ' ') ~< ')' ^^ (x => Vect.fromSeq(x))
-  private def literalVectParser: Parser[Vect] = '[' ~> repsep(atomParser, ' ') ~< ']' ^^ {
-    x => Quote +: Vect.fromSeq(x)
-  }
+    intParser | charParser | vectParser | literalStringParser | symbolParser
+
+  private def charParser: Parser[Char] = '\'' ~> acceptIf(!special(_))(_ => "expected char")
+  private def vectParser: Parser[Vect] = '(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (Vect.fromSeq(_))
+
+  private def singleSpace = elem(' ')
 
   // TODO: allow arbitrary base
-  private def intParser = rep1(digitParser) ^^ (x => numberListToNumber(x, base = 10))
+  private def intParser = rep1(digitParser) ^^ (numberListToNumber(_, base = 10))
 
   private def digitParser: Parser[Int] =
-    acceptIf(c => c.isDigit)(c => "Unexpected '" + c + "' when looking for a digit") ^^ (q => q.asDigit)
+    acceptIf(c => c.isDigit)(c => "Unexpected '" + c + "' when looking for a digit") ^^ (_.asDigit)
 
   private def symbolParser = rep1(
     acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ charListToSymbol
@@ -80,19 +80,18 @@ object Reader extends Parsers {
   private def special(c: Char) =
     c.isWhitespace || c.isControl ||
       c == '(' || c == ')' ||
-      c == '[' || c == ']' ||
-      c == '~' || c == '"' ||
+      c == ''' || c == '"' ||
       c == ';'
 
   private def literalStringParser = '"' ~> rep(insideLiteralParser) ~< '"' ^^ charListToVect
 
   // TODO: allow string escaping
-  private def insideLiteralParser = acceptIf(c => c != '"' && c != '\n' && c != '\\')(c => "Unexpected '" + c + "' when parsing inside quote")
+  private def insideLiteralParser = acceptIf(x => x != '"' && x != '\n')("Unexpected '" + _ + "' when parsing inside a literal string")
 
   private def numberListToNumber(nums: List[Int], base: Int) =
     nums.foldLeft(0) { (acc: Int, value: Int) => acc * base + value }
 
-  private def charListToVect(letters: List[Char]) = Quote +: Vect.fromSeq(letters)
+  private def charListToVect(letters: List[Char]) = WFunc.VectMake +: Vect.fromSeq(letters)
   private def charListToSymbol(letters: List[Char]) = Symbol(new String(letters.toArray))
 
   private def eol = elem('\n') // TODO: support windows, but give warnin'

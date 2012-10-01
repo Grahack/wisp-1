@@ -7,24 +7,8 @@ object Interpretter {
 
   def apply(form: Any, e: Dict): Any = eval(form, e)
 
-  object WTypes extends Enumeration {
-    type WType = Value
-    val TypeBool, TypeSym, TypeNum, TypeDict, TypeVect, TypeType = Value
-  }
+
   import WTypes._
-
-  object WFunc extends Enumeration {
-    type WFunc = Value
-
-    val Eval = Value // primitive (ish)
-    val TypeEq, TypeOf = Value
-    val NumAdd, NumDiv, NumGreaterThan, NumGreaterThanOrEqual, NumEq, NumNeq, NumLessThan, NumLessThanOrEqual, NumMult, NumSub, NumToVect = Value
-    val SymEq, SymToVect = Value
-    val VectAppend, VectCons, VectLength, VectNth, VectReduce, VectSlice = Value
-    val DictContains, DictGet, DictInsert, DictRemove, DictSize, DictToVect = Value
-    val BoolNot, BoolEq = Value
-    val Trace, Error = Value // debuggy
-  }
   import WFunc._
 
   def eval(form: Any, e: Dict): Any = {
@@ -47,10 +31,6 @@ object Interpretter {
             val cond = eval(rawArgs(0), e)
             require(cond.isInstanceOf[Boolean], "Condition in #if statement, should evalute to a boolean -- but instead got: " + cond + ". If statement was: " + rawArgs)
             if (cond.asInstanceOf[Boolean]) eval(rawArgs(1), e) else eval(rawArgs(2), e)
-          }
-          case Quote => {
-            require(rawArgs.length == 1, "Quote should only be given a single argument. Got: " + rawArgs)
-            rawArgs.head
           }
           case wf: WFunc => (wf +: rawArgs.map(eval(_, e))) match {
             case Vect(Eval, v, env: Dict) => eval(v, env)
@@ -100,7 +80,6 @@ object Interpretter {
       case x => x
     }
   }
-
 
   case class VauRun(capEnv: Dict, argS: Symbol, envS: Symbol, capCode: Any) {
     override def toString = "$vau$"

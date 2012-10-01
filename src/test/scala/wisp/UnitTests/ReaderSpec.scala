@@ -4,7 +4,6 @@ import org.specs2.mutable._
 import wisp._
 
 class ReaderSpec extends Specification {
-  sequential
 
   "The Reader" should {
 
@@ -22,37 +21,57 @@ class ReaderSpec extends Specification {
       Reader(path)._2 must_== 434
     }
 
-    "be able to read a number" in {
-      Reader("44")._2 must_== 44
+    "be able to read a numbers" in {
+      read("44") must_== 44
     }
     "be able to read a symbol" in {
-      Reader("cat")._2 must_== 'cat
+      read("cat") must_== 'cat
     }
     "be able to read a string" in {
-      Reader("\"soup\"")._2 must_== Vect(Quote, 's', 'o', 'u', 'p')
+      read("\"soup\"") must_== Vect(WFunc.VectMake, 's', 'o', 'u', 'p')
+      read("\"\"") must_== Vect(WFunc.VectMake)
     }
     "can read chars" in {
-      Reader("~q")._2 must_== 'q'
+      read("'q") must_== 'q'
 
-      Reader("~a ~b ~c ~d ~e ~f")._2 must_== Vect('a', 'b', 'c', 'd', 'e', 'f')
+      read("'a 'b '3 'd 'e 'f") must_== Vect('a', 'b', '3', 'd', 'e', 'f')
     }
-    "read vectors" in {
-      Reader("[a b c d]")._2 == Vect(Quote, 'a, 'b, 'c, 'd)
+    "handle explicit function calls" in {
+      read("(f a b)") must_== Vect('f, 'a, 'b)
+      read("(f (a b) c)") must_== Vect('f, Vect('a, 'b), 'c)
+      read("(f a ") must throwA
+      read("f a a)") must throwA
+      read("(f (a a)") must throwA
     }
-    "work with quoted symbols" in {
-      Reader("'robin")._2 == Vector(Quote, 'robin)
 
-      val r = Reader("'robin")._2 == Vector(Quote, 'robin)
-      r.pp
-      ok
-      // r
+    "work with leading/trailing lines" in {
+      read("\ncat") must_== 'cat
+      read("shield\n") must_== 'shield
     }
-    "handle top level function calls" in {
-      Reader("func arg1 12 arg2")._2 must_== Vect('func, 'arg1, 12, 'arg2)
-    }
-    "explicit function appliction" in {
-      Reader("""(func 65 arg1 44)""")._2 must_== Vect('func, 65, 'arg1, 44)
+
+    "handle implicit function calls" in {
+      read("func a b c") must_== read("(func a b c)")
+
+      read("""
+          |f
+          |	a""".stripMargin) must_== read("(f a)")
+
+      read("""
+    	 |f a b
+    	 |	c
+         |	d""".stripMargin) must_== read("(f a b c d)")
+
+      read("""
+    	 |f a b ; a comment
+    	 |	c d e
+         | ; i don't like this, but the comment is space-prefixed
+         |		f
+         |		g h
+         |	i""".stripMargin) must_== read("(f a b (c d e f (g h) i))")
+
     }
   }
+
+  def read(s: String) = Reader(s)._2
 
 }

@@ -7,12 +7,25 @@ package object wisp {
     lines
   }
 
-    
   // Primitives
   object If
   object Vau
-  
-  // Quote can trivially written as (#vau a _ (#vect-nth a 0)) but it seems a little nicer
-  // having the reader emit this
-  object Quote
+
+  object WTypes extends Enumeration {
+    type WType = Value
+    val TypeBool, TypeSym, TypeNum, TypeDict, TypeVect, TypeType = Value
+  }
+
+  object WFunc extends Enumeration {
+    type WFunc = Value
+
+    val Eval = Value // primitive (ish)
+    val TypeEq, TypeOf = Value
+    val NumAdd, NumDiv, NumGreaterThan, NumGreaterThanOrEqual, NumEq, NumNeq, NumLessThan, NumLessThanOrEqual, NumMult, NumSub, NumToVect = Value
+    val SymEq, SymToVect = Value
+    val VectAppend, VectCons, VectLength, VectMake, VectNth, VectReduce, VectSlice = Value
+    val DictContains, DictGet, DictInsert, DictRemove, DictSize, DictToVect = Value
+    val BoolNot, BoolEq = Value
+    val Trace, Error = Value // debuggy
+  }
 }
