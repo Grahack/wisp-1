@@ -14,7 +14,7 @@ A file is made up of list of lines. A line may be blank, or may contain a *singl
 
 Atom
 ====
-An atom is either a: Number, String, Symbol or a List
+An atom is either a: Number, Char, Symbol or a List
 
 Number
 ======
@@ -22,20 +22,22 @@ Numbers are integer values. They (currently) can not contain a decimal place or 
 
 Valid Numbers: `1237` `0` `-123`
 
-Invalid: `423.7` `1,000` *(Note: in the future, probably both of these will be valid)*
+Invalid: `423.7` `1,000`
 
-String
+Char
 ======
-Strings start with a quote `"` and end with a quote `"`. They may contain whitespace, but may not span more than a line. They support c-style escape characters e.g. `\n` for newline. *(Note: escape characters not yet implemented)*
+A character is prefixed by using a single backquote `\`. The subsequent character is interpretted as the character.
 
-Valid Strings: `"ch- icken"` `"\"soup?\" he asked"` `"man\ndog`
+Escape Characters: `\space` `\tab` `\newline` `\semicolon` `\backslash`
 
-Invalid Strings: `ch- icken` `""soup?" he asked"` `"undefined escape \e" `
+Valid Characters: `'a` `'5` `'\t`
+
+Invalid: `'ab` `' `
 
 
 Symbol
 =======
-Everything is a symbol, provided it doesn't contain whitespace or control characters (space, tabs, endline etc.). Additionally it must not contain a quote, or start with something that would a number. *(Note: in the future escape characters will probably be allowed inside a symbol)*
+Everything is a symbol, provided it doesn't contain whitespace or control characters (space, tabs, endline etc.). Additionally it must not contain a quote, or start with something that would a number.
 
 Valid Symbols: `dog` `cat` `+` `=`  `<3` `true` `-lol` `@#$#^#$/*`
 
@@ -48,6 +50,7 @@ A list starts with a `(` contains zero or more atoms, and ends with a `)`. *This
 Valid lists: `(1 "chicken" dog)` `()` `(+ (***) (sup) ())` 
 
 Using the above syntax, you have absolutely everything you need. However, as you probably guessed by the project name, and extremely strict rules extremely strict rules (no new lines in side a list, and one atom per line) there is a much nicer way to create lists.
+
 
 Implicit Lists
 ==============
@@ -95,7 +98,25 @@ q
 
 If you got `(q (a c foo) (44 1 ("chicken" 343)))` then congratulate yourself, you're now an expert!
 
+Convience Lists:
+========
 
+Often you would need to write `(#VectMake 1 2 3)` to make something that evaluates to a list of three elements. A convience syntax for this is: `[1 2 3]`. The reader reads it identically to as if you wrote `(#VectMake 1 2 3)`
+
+And likewise, you would find yourself writing things like `['h 'e 'l 'l 'o]` very often. So if your list is a string (or rather, a list of characters, you can use the convience quoted string syntax. Just like the `[]` it reads it with the #VectMake prefix. So `"cowboy"` is read as: `(#VectMake 'c 'o 'w 'b 'o 'y)`
+
+Strings may not contain: end of lines, or double-quotes. `\` is used as an escape-sequence:
+
+Escape sequence: `\\` (backslash) `\n` (newline) `\"` (quote)
+
+Valid Strings: `"ch- icken"` `"\"soup?\" he asked"` `"man\ndog"`
+
+Invalid Strings: `ch- icken` `""soup?" he asked"` `"undefined escape \e"`
+
+
+Comments:
+=======
+Comments start with `;` and continue to the end of the line. It is not valid to use `;` inside of strings, symbols or characters. The char you need to use is`\semicolon`
 
 Note
 =========
@@ -103,17 +124,6 @@ Note
 * Indentation is done with tabs. You must start at 0 tabs, the next level must have 1 tab, the next level is 2 tabs. The reader is very strict about this. Mixing tabs and spaces at the start of a line is absolutely not allowed.
 
 * Blank lines are ignored.
-
-* There's no comments, but in practise this isn't an issue as you can easily just filter out all lists that start with the `//` symbol (or what ever your prefer). e.g.
-
-```
-// the symbol "//" is my comment function, which throws aways its arguments
-// as a bonus, i can even use multi line comments for free
-	this is part of the above list, neat huh?
-// the only thing to becareful of is having an unterminated (double) quote, as that will screw the parser	
-```
-
-* When using the repl, if you end a line with `\` the repl will automatically add a new identation for you, and allow you to continue entering your list. However, the repl strips out the `\` and it is never even given to wisp, nor part of its syntax.
 
 * When a file is read, it gives a List of Atoms.
 

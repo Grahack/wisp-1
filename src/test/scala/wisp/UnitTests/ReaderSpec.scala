@@ -32,12 +32,22 @@ class ReaderSpec extends Specification {
       read("\"\"") must_== Vect(WFunc.VectMake)
     }
     "can read chars" in {
-      read("'q") must_== 'q'
+      read("""\q""") must_== 'q'
 
-      read("'a 'b '3 'd 'e 'f") must_== Vect('a', 'b', '3', 'd', 'e', 'f')
+      read("""\a \b \3 \d \e \f""") must_== Vect('a', 'b', '3', 'd', 'e', 'f')
     }
-    "handle explicit function calls" in {
+    "work with convience quoted lists" in {
+      read("[1 2 3]") must_== Vect(WFunc.VectMake, 1, 2, 3)
+    }
+    "handle explicit function calls / lists" in {
       read("(f a b)") must_== Vect('f, 'a, 'b)
+      read("f a b") must_== read("(f a b)")
+      
+      read("f.x") must_== Vect('f, 'x)
+      read("loco.34") must_== Vect('loco, 34)
+      read("a f g.x") must_== read("a f (g x)")
+      //read
+      
       read("(f (a b) c)") must_== Vect('f, Vect('a, 'b), 'c)
       read("(f a ") must throwA
       read("f a a)") must throwA
@@ -49,7 +59,7 @@ class ReaderSpec extends Specification {
       read("shield\n") must_== 'shield
     }
 
-    "handle implicit function calls" in {
+    "handle significant whitespace" in {
       read("func a b c") must_== read("(func a b c)")
 
       read("""
@@ -63,11 +73,12 @@ class ReaderSpec extends Specification {
 
       read("""
     	 |f a b ; a comment
-    	 |	c d e
+    	 |	c.d e
          | ; i don't like this, but the comment is space-prefixed
+         |
          |		f
          |		g h
-         |	i""".stripMargin) must_== read("(f a b (c d e f (g h) i))")
+         |	i""".stripMargin) must_== read("(f a b ((c d) e f (g h) i))")
 
     }
   }

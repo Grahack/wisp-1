@@ -61,10 +61,11 @@ object Reader extends Parsers {
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
 
   private def atomParser: Parser[Any] =
-    intParser | charParser | vectParser | literalStringParser | symbolParser
+    (intParser | charParser | vectParser | literalStringParser | literalVectParser | symbolParser) ~ opt('.' ~> atomParser) ^^ (x => if (x._2.isDefined) Vect(x._1, x._2.get) else x._1  )
 
-  private def charParser: Parser[Char] = '\'' ~> acceptIf(!special(_))(_ => "expected char")
+  private def charParser: Parser[Char] = '\\' ~> acceptIf(!special(_))(_ => "expected char")
   private def vectParser: Parser[Vect] = '(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (Vect.fromSeq(_))
+  private def literalVectParser: Parser[Vect] = '[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ (WFunc.VectMake +: Vect.fromSeq(_))
 
   private def singleSpace = elem(' ')
 
@@ -80,8 +81,9 @@ object Reader extends Parsers {
   private def special(c: Char) =
     c.isWhitespace || c.isControl ||
       c == '(' || c == ')' ||
-      c == ''' || c == '"' ||
-      c == ';'
+      c == '[' || c == ']' ||
+      c == '\\' || c == '"' ||
+      c == ';' || c == '.'
 
   private def literalStringParser = '"' ~> rep(insideLiteralParser) ~< '"' ^^ charListToVect
 

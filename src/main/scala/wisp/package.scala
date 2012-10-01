@@ -7,7 +7,6 @@ package object wisp {
     lines
   }
 
-  // Primitives
   object If
   object Vau
 
