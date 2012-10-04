@@ -7,7 +7,6 @@ object Interpretter {
 
   def apply(form: Any, e: Dict): Any = eval(form, e)
 
-
   import WTypes._
   import WFunc._
 
@@ -21,7 +20,7 @@ object Interpretter {
           case Vau => rawArgs match {
             case Vect(argS: Symbol, envS: Symbol, code) =>
               require(!e.contains(argS), "Can't use symbol " + argS + " for binding an argument list, as it already exists")
-              require(!e.contains(envS), "Can't use symbol " + envS + " for binding an environment, as it already exists")
+              require(!e.contains(envS), "Can't use  symbol " + envS + " for binding an environment, as it already exists")
               require(envS != argS, "Can't use the same symbol for binding the environment and argument")
               VauRun(e, argS, envS, code)
             case x => sys.error("#vau expects three arguments, an arg symbol, an env symbol, and the body of the code. Instead found: " + rawArgs)
@@ -34,15 +33,17 @@ object Interpretter {
           }
           case wf: WFunc => (wf +: rawArgs.map(eval(_, e))) match {
             case Vect(Eval, v, env: Dict) => eval(v, env)
+            
             // type stuff
             case Vect(TypeEq, a: WType, b: WType) => a == b
             case Vect(TypeOf, a) => a match {
               case _: Boolean => TypeBool
+              case _: Dict => TypeDict
+              case _: WFunc => TypeFunc
               case _: Int => TypeNum
               case _: Symbol => TypeSym
-              case _: Vect => TypeVect
-              case _: Dict => TypeDict
               case _: WType => TypeType
+              case _: Vect => TypeVect
             }
             case Vect(NumAdd, a: Int, b: Int) => a + b
             case Vect(NumDiv, a: Int, b: Int) => a / b

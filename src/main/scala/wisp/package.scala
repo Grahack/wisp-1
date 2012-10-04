@@ -9,16 +9,16 @@ package object wisp {
 
   object If
   object Vau
-
+  
   object WTypes extends Enumeration {
     type WType = Value
-    val TypeBool, TypeSym, TypeNum, TypeDict, TypeVect, TypeType = Value
+    val TypeBool, TypeSym, TypeNum, TypeDict, TypeFunc, TypeVect, TypeType = Value
   }
 
   object WFunc extends Enumeration {
     type WFunc = Value
 
-    val Eval = Value // primitive (ish)
+    val Eval, EnvOf, AstOf = Value // primitive (ish)
     val TypeEq, TypeOf = Value
     val NumAdd, NumDiv, NumGreaterThan, NumGreaterThanOrEqual, NumEq, NumNeq, NumLessThan, NumLessThanOrEqual, NumMult, NumSub, NumToVect = Value
     val SymEq, SymToVect = Value
