@@ -31,7 +31,7 @@ object Reader extends Parsers {
       case Some('import +: paths) =>
         require(forms.length == 2, "A file with an import, must only have two forms")
 
-        val imports = paths.data.map(_.asInstanceOf[String])
+        val imports = paths.data.map(_.asInstanceOf[String]).self.toList
 
         (imports -> forms.last)
 
@@ -46,7 +46,7 @@ object Reader extends Parsers {
   private def atomListParser(depth: Int): Parser[Any] =
     rep(blankLine) ~>
       repN(depth, '\t') ~>
-      rep1sep(atomParser, singleSpace) ~ 
+      rep1sep(atomParser, singleSpace) ~
       rep(atomListParser(depth + 1)) ^^ (x => stitch(x._1, x._2))
 
   private def stitch(a: Seq[Any], b: Seq[Any]) = {
@@ -56,12 +56,12 @@ object Reader extends Parsers {
     else
       Vect.fromSeq(a ++ b)
   }
-      
+
   private def comment = ';' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
 
   private def atomParser: Parser[Any] =
-    (intParser | charParser | vectParser | literalStringParser | literalVectParser | symbolParser) ~ opt('.' ~> atomParser) ^^ (x => if (x._2.isDefined) Vect(x._1, x._2.get) else x._1  )
+    (intParser | charParser | vectParser | literalStringParser | literalVectParser | symbolParser) ~ opt('.' ~> atomParser) ^^ (x => if (x._2.isDefined) Vect(x._1, x._2.get) else x._1)
 
   private def charParser: Parser[Char] = '\\' ~> acceptIf(!special(_))(_ => "expected char")
   private def vectParser: Parser[Vect] = '(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (Vect.fromSeq(_))
@@ -101,4 +101,60 @@ object Reader extends Parsers {
   // get around annoying precedent rule of <~
   implicit private def toUnannoying[T](p: Parser[T]): UnannoyingParser[T] = new UnannoyingParser(p)
   private class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
+
+  import WTypes._
+  import WFunc._
+  
+  def startingEnv = Map(
+    // Some pretty primitive stuff
+    Symbol("#eval") -> Eval,
+    Symbol("#if") -> If,
+    Symbol("#vau") -> Vau,
+    // Types
+    Symbol("#Bool") -> TypeBool,
+    Symbol("#Dict") -> TypeDict,
+    Symbol("#Num") -> TypeNum,
+    Symbol("#Sym") -> TypeSym,
+    Symbol("#Type") -> TypeType,
+    Symbol("#type-eq") -> TypeEq,
+    Symbol("#type-of") -> TypeOf,
+    Symbol("#Vect") -> TypeVect,
+    // some num stuff
+    Symbol("#num-add") -> NumAdd,
+    Symbol("#num-div") -> NumDiv,
+    Symbol("#num-eq") -> NumEq,
+    Symbol("#num-gt") -> NumGreaterThan,
+    Symbol("#num-gte") -> NumGreaterThanOrEqual,
+    Symbol("#num-lt") -> NumLessThan,
+    Symbol("#num-lte") -> NumLessThanOrEqual,
+    Symbol("#num-mult") -> NumMult,
+    Symbol("#num-neq") -> NumNeq,
+    Symbol("#num-sub") -> NumSub,
+    Symbol("#num-to-str") -> NumToVect,
+    // sym stuff
+    Symbol("#sym-eq") -> SymEq,
+    Symbol("#sym-to-vect") -> SymToVect,
+    // vect functions
+    Symbol("#vect-append") -> VectAppend,
+    Symbol("#vect-cons") -> VectCons,
+    Symbol("#vect-length") -> VectLength,
+    Symbol("#vect-nth") -> VectNth,
+    Symbol("#vect-reduce") -> VectReduce,
+    Symbol("#vect-slice") -> VectSlice,
+    // Dict functions
+    Symbol("#dict-contains") -> DictContains,
+    Symbol("#dict-empty") -> Dict(),
+    Symbol("#dict-get") -> DictGet,
+    Symbol("#dict-insert") -> DictInsert,
+    Symbol("#dict-remove") -> DictRemove,
+    Symbol("#dict-size") -> DictSize,
+    Symbol("#dict-to-vect") -> DictToVect,
+    // boolean
+    Symbol("#bool-eq") -> BoolEq,
+    Symbol("#bool-false") -> false,
+    Symbol("#bool-not") -> BoolNot,
+    Symbol("#bool-true") -> true,
+    // debug
+    Symbol("#error") -> Error,
+    Symbol("#trace") -> Trace)
 }

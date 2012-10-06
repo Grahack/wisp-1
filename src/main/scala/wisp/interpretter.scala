@@ -33,13 +33,13 @@ object Interpretter {
           }
           case wf: WFunc => (wf +: rawArgs.map(eval(_, e))) match {
             case Vect(Eval, v, env: Dict) => eval(v, env)
-            
+
             // type stuff
             case Vect(TypeEq, a: WType, b: WType) => a == b
             case Vect(TypeOf, a) => a match {
               case _: Boolean => TypeBool
               case _: Dict => TypeDict
-              case _: WFunc => TypeFunc
+              case _: WFunc | VauRun | Vau | If => TypeFunc
               case _: Int => TypeNum
               case _: Symbol => TypeSym
               case _: WType => TypeType
@@ -86,56 +86,4 @@ object Interpretter {
     override def toString = "$vau$"
   }
 
-  def startingEnv = Dict() +
-    // Some pretty primitive stuff
-    (Symbol("#eval") -> Eval) +
-    (Symbol("#if") -> If) +
-    (Symbol("#vau") -> Vau) +
-    // Types
-    (Symbol("#Bool") -> TypeBool) +
-    (Symbol("#Dict") -> TypeDict) +
-    (Symbol("#Num") -> TypeNum) +
-    (Symbol("#Sym") -> TypeSym) +
-    (Symbol("#Type") -> TypeType) +
-    (Symbol("#type-eq") -> TypeEq) +
-    (Symbol("#type-of") -> TypeOf) +
-    (Symbol("#Vect") -> TypeVect) +
-    // some num stuff
-    (Symbol("#num-add") -> NumAdd) +
-    (Symbol("#num-div") -> NumDiv) +
-    (Symbol("#num-eq") -> NumEq) +
-    (Symbol("#num-gt") -> NumGreaterThan) +
-    (Symbol("#num-gte") -> NumGreaterThanOrEqual) +
-    (Symbol("#num-lt") -> NumLessThan) +
-    (Symbol("#num-lte") -> NumLessThanOrEqual) +
-    (Symbol("#num-mult") -> NumMult) +
-    (Symbol("#num-neq") -> NumNeq) +
-    (Symbol("#num-sub") -> NumSub) +
-    (Symbol("#num-to-str") -> NumToVect) +
-    // sym stuff
-    (Symbol("#sym-eq") -> SymEq) +
-    (Symbol("#sym-to-vect") -> SymToVect) +
-    // vect functions
-    (Symbol("#vect-append") -> VectAppend) +
-    (Symbol("#vect-cons") -> VectCons) +
-    (Symbol("#vect-length") -> VectLength) +
-    (Symbol("#vect-nth") -> VectNth) +
-    (Symbol("#vect-reduce") -> VectReduce) +
-    (Symbol("#vect-slice") -> VectSlice) +
-    // Dict functions
-    (Symbol("#dict-contains") -> DictContains) +
-    (Symbol("#dict-empty") -> Dict()) +
-    (Symbol("#dict-get") -> DictGet) +
-    (Symbol("#dict-insert") -> DictInsert) +
-    (Symbol("#dict-remove") -> DictRemove) +
-    (Symbol("#dict-size") -> DictSize) +
-    (Symbol("#dict-to-vect") -> DictToVect) +
-    // boolean
-    (Symbol("#bool-eq") -> BoolEq) +
-    (Symbol("#bool-false") -> false) +
-    (Symbol("#bool-not") -> BoolNot) +
-    (Symbol("#bool-true") -> true) +
-    // debug
-    (Symbol("#error") -> Error) +
-    (Symbol("#trace") -> Trace)
 }

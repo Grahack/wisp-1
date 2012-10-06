@@ -9,6 +9,7 @@ scalaVersion := "2.9.2"
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 libraryDependencies ++= Seq("com.github.mdr" %% "ascii-graphs" % "0.0.1",
+  "org.scalaz" % "scalaz-core_2.9.2" % "7.0.0-M3",
   "org.specs2" %% "specs2" % "1.12.2-SNAPSHOT" % "test",
   "org.pegdown" % "pegdown" % "1.0.2" % "test")
 

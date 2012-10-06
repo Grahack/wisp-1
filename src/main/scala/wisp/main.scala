@@ -5,7 +5,12 @@ import java.nio.file.Path
 import java.nio.file.StandardWatchEventKinds
 import java.text.DecimalFormat
 
+import scala.collection.GenTraversable
+import scala.collection.generic.CanBuildFrom
+import scala.collection.mutable.Builder
+
 object Main {
+
   def main(args: Array[String]) {
 
     val watch = args.contains("-w")
@@ -29,7 +34,6 @@ Valid options are:
             awesome ascii-art dependency graphs. """)
     } else {
       val path = Paths.get(rest.head)
-      
 
       val dag = loadAll(Dag[Path, Any](), path, verbose)
 
@@ -50,7 +54,7 @@ Valid options are:
       println("Loading file: " + path)
 
     val (imports, value) = Reader(path)
-    
+
     val importPaths = imports.map(path.resolveSibling(_)).toSet // TODO: check for dupes ?
 
     importPaths.foldLeft(current.add(path, value, importPaths)) {
@@ -67,7 +71,7 @@ Valid options are:
 
     val data = dag.topologicalSort.reverse.map(x => x -> dag.payload(x))
 
-    val r = data.foldLeft(Interpretter.startingEnv: Any) {
+    val r = data.foldLeft(Reader.startingEnv: Any) {
       case (env, (path, form)) =>
         require(env.isInstanceOf[Dict], "Expected the result of an import to give us an environment, instead found: " + env)
 

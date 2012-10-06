@@ -18,7 +18,7 @@ package object wisp {
   object WFunc extends Enumeration {
     type WFunc = Value
 
-    val Eval, EnvOf, AstOf = Value // primitive (ish)
+    val Eval = Value // primitive (ish)
     val TypeEq, TypeOf = Value
     val NumAdd, NumDiv, NumGreaterThan, NumGreaterThanOrEqual, NumEq, NumNeq, NumLessThan, NumLessThanOrEqual, NumMult, NumSub, NumToVect = Value
     val SymEq, SymToVect = Value
