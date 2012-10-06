@@ -28,10 +28,10 @@ object Reader extends Parsers {
     }
 
     forms.headOption match {
-      case Some('import +: paths) =>
+      case Some('import #:: paths) =>
         require(forms.length == 2, "A file with an import, must only have two forms")
 
-        val imports = paths.data.map(_.asInstanceOf[String]).self.toList
+        val imports = paths.map(_.asInstanceOf[String])
 
         (imports -> forms.last)
 
@@ -51,21 +51,22 @@ object Reader extends Parsers {
 
   private def stitch(a: Seq[Any], b: Seq[Any]) = {
     assert(a.length >= 1)
+    println("Stiching: " + a + " and " + b)
     if (a.length == 1 && b.length == 0)
       a.head
     else
-      Vect.fromSeq(a ++ b)
+      a.toStream ++ b.toStream
   }
 
   private def comment = ';' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
 
   private def atomParser: Parser[Any] =
-    (intParser | charParser | vectParser | literalStringParser | literalVectParser | symbolParser) ~ opt('.' ~> atomParser) ^^ (x => if (x._2.isDefined) Vect(x._1, x._2.get) else x._1)
+    (intParser | charParser | listParser | literalStringParser | literalListParser | symbolParser) ~ opt('.' ~> atomParser) ^^ (x => if (x._2.isDefined) Stream(x._1, x._2.get) else x._1)
 
   private def charParser: Parser[Char] = '\\' ~> acceptIf(!special(_))(_ => "expected char")
-  private def vectParser: Parser[Vect] = '(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (Vect.fromSeq(_))
-  private def literalVectParser: Parser[Vect] = '[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ (WFunc.VectMake +: Vect.fromSeq(_))
+  private def listParser: Parser[WList] = '(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (_.toStream)
+  private def literalListParser: Parser[WList] = '[' ~> repsep(atomParser, singleSpace) ~< ']' ^^  (x => WFunc.ListMake #:: (x.toStream: WList))
 
   private def singleSpace = elem(' ')
 
@@ -93,7 +94,7 @@ object Reader extends Parsers {
   private def numberListToNumber(nums: List[Int], base: Int) =
     nums.foldLeft(0) { (acc: Int, value: Int) => acc * base + value }
 
-  private def charListToVect(letters: List[Char]) = WFunc.VectMake +: Vect.fromSeq(letters)
+  private def charListToVect(letters: List[Char]) = WFunc.ListMake #:: (letters.toStream: WList)
   private def charListToSymbol(letters: List[Char]) = Symbol(new String(letters.toArray))
 
   private def eol = elem('\n') // TODO: support windows, but give warnin'
@@ -118,7 +119,7 @@ object Reader extends Parsers {
     Symbol("#Type") -> TypeType,
     Symbol("#type-eq") -> TypeEq,
     Symbol("#type-of") -> TypeOf,
-    Symbol("#Vect") -> TypeVect,
+    Symbol("#List") -> TypeList,
     // some num stuff
     Symbol("#num-add") -> NumAdd,
     Symbol("#num-div") -> NumDiv,
@@ -130,17 +131,17 @@ object Reader extends Parsers {
     Symbol("#num-mult") -> NumMult,
     Symbol("#num-neq") -> NumNeq,
     Symbol("#num-sub") -> NumSub,
-    Symbol("#num-to-str") -> NumToVect,
+    Symbol("#num-to-str") -> NumToList,
     // sym stuff
     Symbol("#sym-eq") -> SymEq,
     Symbol("#sym-to-vect") -> SymToVect,
     // vect functions
-    Symbol("#vect-append") -> VectAppend,
-    Symbol("#vect-cons") -> VectCons,
-    Symbol("#vect-length") -> VectLength,
-    Symbol("#vect-nth") -> VectNth,
-    Symbol("#vect-reduce") -> VectReduce,
-    Symbol("#vect-slice") -> VectSlice,
+    Symbol("#list-cons") -> ListCons,
+    Symbol("#list-empty") -> ListEmpty,
+    Symbol("#list-length") -> ListLength,
+    Symbol("#list-make") -> ListMake,
+    Symbol("#list-nth") -> ListNth,
+    Symbol("#list-reduce") -> ListReduce,
     // Dict functions
     Symbol("#dict-contains") -> DictContains,
     Symbol("#dict-empty") -> Dict(),
@@ -148,7 +149,7 @@ object Reader extends Parsers {
     Symbol("#dict-insert") -> DictInsert,
     Symbol("#dict-remove") -> DictRemove,
     Symbol("#dict-size") -> DictSize,
-    Symbol("#dict-to-vect") -> DictToVect,
+    Symbol("#dict-to-list") -> DictToList,
     // boolean
     Symbol("#bool-eq") -> BoolEq,
     Symbol("#bool-false") -> false,

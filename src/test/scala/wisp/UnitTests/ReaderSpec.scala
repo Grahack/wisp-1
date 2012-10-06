@@ -28,27 +28,27 @@ class ReaderSpec extends Specification {
       read("cat") must_== 'cat
     }
     "be able to read a string" in {
-      read("\"soup\"") must_== Vect(WFunc.VectMake, 's', 'o', 'u', 'p')
-      read("\"\"") must_== Vect(WFunc.VectMake)
+      read("\"soup\"") must_== List(WFunc.ListMake, 's', 'o', 'u', 'p')
+      read("\"\"") must_== List(WFunc.ListMake)
     }
     "can read chars" in {
       read("""\q""") must_== 'q'
 
-      read("""\a \b \3 \d \e \f""") must_== Vect('a', 'b', '3', 'd', 'e', 'f')
+      read("""\a \b \3 \d \e \f""") must_== List('a', 'b', '3', 'd', 'e', 'f')
     }
     "work with convience quoted lists" in {
-      read("[1 2 3]") must_== Vect(WFunc.VectMake, 1, 2, 3)
+      read("[1 2 3]") must_== List(WFunc.ListMake, 1, 2, 3)
     }
     "handle explicit function calls / lists" in {
-      read("(f a b)") must_== Vect('f, 'a, 'b)
+      read("(f a b)") must_== List('f, 'a, 'b)
       read("f a b") must_== read("(f a b)")
       
-      read("f.x") must_== Vect('f, 'x)
-      read("loco.34") must_== Vect('loco, 34)
+      read("f.x") must_== List('f, 'x)
+      read("loco.34") must_== List('loco, 34)
       read("a f g.x") must_== read("a f (g x)")
       //read
       
-      read("(f (a b) c)") must_== Vect('f, Vect('a, 'b), 'c)
+      read("(f (a b) c)") must_== List('f, List('a, 'b), 'c)
       read("(f a ") must throwA
       read("f a a)") must throwA
       read("(f (a a)") must throwA
@@ -78,7 +78,7 @@ class ReaderSpec extends Specification {
          |
          |		f
          |		g h
-         |	i""".stripMargin) must_== read("(f a b ((c d) e f (g h) i))")
+         |	i""".stripMargin) must_== read("(f a b ((c d) e f (g h)) i)")
 
     }
   }
