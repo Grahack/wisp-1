@@ -4,16 +4,14 @@ name := "Wisp"
 
 version := "0.1-SNAPSHOT"
 
-scalaVersion := "2.9.2"
+scalaVersion := "2.10.0-M7"
 
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
-libraryDependencies ++= Seq("com.github.mdr" %% "ascii-graphs" % "0.0.1",
-  "org.scalaz" % "scalaz-core_2.9.2" % "7.0.0-M3",
-  "org.specs2" %% "specs2" % "1.12.2-SNAPSHOT" % "test",
-  "org.pegdown" % "pegdown" % "1.0.2" % "test")
+libraryDependencies ++= Seq(//"com.github.mdr" %% "ascii-graphs" % "0.0.1",
+  "org.specs2" % "specs2_2.10.0-M7" % "1.12.1.1" % "test")
 
-scalacOptions ++= Seq("-deprecation", "-Ydependent-method-types", "-unchecked")
+scalacOptions ++= Seq("-deprecation", "-unchecked")
 
 jarName in assembly := "wisp.jar"
 

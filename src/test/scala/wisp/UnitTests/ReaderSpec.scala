@@ -2,6 +2,7 @@ package wisp.unit_tests
 
 import org.specs2.mutable._
 import wisp._
+import scala.util.parsing.input.Positional
 
 class ReaderSpec extends Specification {
 
@@ -18,45 +19,61 @@ class ReaderSpec extends Specification {
       stream.write("434")
       stream.close()
 
-      Reader(path)._2 must_== 434
+      434 must_== Reader(path)._2 // specs2 bug
     }
 
     "be able to read a numbers" in {
-      read("44") must_== 44
+      44 must_== read("44")
+
+      val pos = read("eat 189 chicken").asInstanceOf[AtomList].value(1).asInstanceOf[Positional].pos
+
+      pos.line must_== 1
+      pos.column must_== 5
     }
     "be able to read a symbol" in {
-      read("cat") must_== 'cat
+      'cat must_== read("cat")
+
+      val pos = read("\nhi cat rabbit").asInstanceOf[AtomList].value(2).asInstanceOf[Positional].pos
+
+      pos.line must_== 2
+      pos.column must_== 8
+
     }
     "be able to read a string" in {
-      read("\"soup\"") must_== List(WFunc.ListMake, 's', 'o', 'u', 'p')
-      read("\"\"") must_== List(WFunc.ListMake)
+      List(ListMake, 's', 'o', 'u', 'p') must_== read("\"soup\"") 
+      List(ListMake) must_== read("\"\"")
+      
+      val pos = read("100 \"robbers\"").asInstanceOf[AtomList].value(1).asInstanceOf[Positional].pos
+
+      pos.line must_== 1
+      pos.column must_== 5
     }
     "can read chars" in {
-      read("""\q""") must_== 'q'
+      'q' must_== read("~q")
 
-      read("""\a \b \3 \d \e \f""") must_== List('a', 'b', '3', 'd', 'e', 'f')
+      List('a', 'b', '3', 'd', 'e', 'f') must_== read("~a ~b ~3 ~d ~e ~f")
     }
-    "work with convience quoted lists" in {
-      read("[1 2 3]") must_== List(WFunc.ListMake, 1, 2, 3)
+    "work with convenience quoted lists" in {
+      List(ListMake, 1, 2, 3) must_== read("[1 2 3]")
     }
     "handle explicit function calls / lists" in {
-      read("(f a b)") must_== List('f, 'a, 'b)
+      List('f, 'a, 'b) must_== read("(f a b)")
       read("f a b") must_== read("(f a b)")
-      
-      read("f.x") must_== List('f, 'x)
-      read("loco.34") must_== List('loco, 34)
+
+      List('f, 'x) must_== read("f.x")
+      List('loco, 34) must_== read("loco.34")
       read("a f g.x") must_== read("a f (g x)")
       //read
-      
-      read("(f (a b) c)") must_== List('f, List('a, 'b), 'c)
+
+      List('f, List('a, 'b), 'c) must_== read("(f (a b) c)")
       read("(f a ") must throwA
       read("f a a)") must throwA
       read("(f (a a)") must throwA
     }
 
-    "work with leading/trailing lines" in {
-      read("\ncat") must_== 'cat
-      read("shield\n") must_== 'shield
+    "work with leading/trailing slines" in {
+      'cat must_== read("\ncat")
+      'shield must_== read("shield\n")
     }
 
     "handle significant whitespace" in {

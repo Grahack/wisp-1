@@ -80,6 +80,7 @@ class Dag[A, P](val direct: Map[A, Set[A]], val reverse: Map[A, Set[A]], val pay
   def root: A = topologicalSort.head // TODO: this should be done a bit smarter...
 
   def toAscii = {
+    /*
     import com.github.mdr.ascii.layout._
 
     val vertices = payload.keys.toList
@@ -89,5 +90,7 @@ class Dag[A, P](val direct: Map[A, Set[A]], val reverse: Map[A, Set[A]], val pay
     ) yield (pair._1 -> to)
 
     Layouter.renderGraph(Graph(vertices, edges))
+    */
+    "ascii-graph doesn't support this version of scala"
   }
 }
