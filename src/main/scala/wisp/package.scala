@@ -7,12 +7,5 @@ package object wisp {
     lines
   }
 
-  val WList = Stream
-  type WList = Stream[Any]
-  type IsWList = Stream[_]
-
-  object If
-  object Vau
-
 
 }

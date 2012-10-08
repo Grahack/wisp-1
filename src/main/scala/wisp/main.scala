@@ -73,12 +73,12 @@ Valid options are:
 
     val r = data.foldLeft(Reader.startingEnv: Any) {
       case (env, (path, form)) =>
-        require(env.isInstanceOf[Dict], "Expected the result of an import to give us an environment, instead found: " + env)
+        require(env.isInstanceOf[WDict], "Expected the result of an import to give us an environment, instead found: " + env)
 
         if (verbose)
           println("About to interpret file: " + path)
 
-        val (result, t) = timeFunc(Interpretter(form, env.asInstanceOf[Dict]))
+        val (result, t) = timeFunc(Interpretter(/*form*/null, env.asInstanceOf[WDict].value))
 
         if (verbose)
           println("..took " + t)

@@ -25,7 +25,7 @@ class ReaderSpec extends Specification {
     "be able to read a numbers" in {
       44 must_== read("44")
 
-      val pos = read("eat 189 chicken").asInstanceOf[AtomList].value(1).asInstanceOf[Positional].pos
+      val pos = read("eat 189 chicken").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
 
       pos.line must_== 1
       pos.column must_== 5
@@ -33,7 +33,7 @@ class ReaderSpec extends Specification {
     "be able to read a symbol" in {
       'cat must_== read("cat")
 
-      val pos = read("\nhi cat rabbit").asInstanceOf[AtomList].value(2).asInstanceOf[Positional].pos
+      val pos = read("\nhi cat rabbit").asInstanceOf[WList].value(2).asInstanceOf[Positional].pos
 
       pos.line must_== 2
       pos.column must_== 8
@@ -43,7 +43,7 @@ class ReaderSpec extends Specification {
       List(ListMake, 's', 'o', 'u', 'p') must_== read("\"soup\"") 
       List(ListMake) must_== read("\"\"")
       
-      val pos = read("100 \"robbers\"").asInstanceOf[AtomList].value(1).asInstanceOf[Positional].pos
+      val pos = read("100 \"robbers\"").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
 
       pos.line must_== 1
       pos.column must_== 5

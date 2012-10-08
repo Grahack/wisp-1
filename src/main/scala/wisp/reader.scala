@@ -44,47 +44,47 @@ object Reader extends Parsers {
     }
   }
   
-  private def fileParser: Parser[AtomList] = 
-    positioned(rep(atomListParser(0)) ~< rep(eol) ^^ (x => new AtomList(x.toStream) with Positional))
+  private def fileParser: Parser[WList] = 
+    positioned(rep(WListParser(0)) ~< rep(eol) ^^ (x => new WList(x.toStream) with Positional))
 
-  private def atomListParser(depth: Int): Parser[Atom] =
+  private def WListParser(depth: Int): Parser[W] =
     rep(blankLine) ~>
       repN(depth, '\t') ~>
-      rep1sep(atomParser, singleSpace) ~
-      rep(atomListParser(depth + 1)) ^^ (x => stitch(x._1, x._2))
+      rep1sep(WParser, singleSpace) ~
+      rep(WListParser(depth + 1)) ^^ (x => stitch(x._1, x._2))
 
-  private def stitch(a: Seq[Atom], b: Seq[Atom]) = {
+  private def stitch(a: Seq[W], b: Seq[W]) = {
     assert(a.length >= 1)
     if (a.length == 1 && b.length == 0)
       a.head
     else
-      new AtomList(a.toStream ++ b.toStream)
+      new WList(a.toStream ++ b.toStream)
   }
 
   private def comment = ';' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
 
-  private def atomParser: Parser[Atom with Positional] =
-    positioned((numParser | charParser | listParser | literalStringParser | literalListParser | symbolParser) ~ opt('.' ~> atomParser) ^^
-      (x => if (x._2.isDefined) new AtomList(Stream(x._1, x._2.get)) with Positional else x._1))
+  private def WParser: Parser[W with Positional] =
+    positioned((numParser | charParser | listParser | literalStringParser | literalListParser | symbolParser) ~ opt('.' ~> WParser) ^^
+      (x => if (x._2.isDefined) new WList(Stream(x._1, x._2.get)) with Positional else x._1))
 
   private def charParser =
-    positioned('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => new AtomChar(x) with Positional))
+    positioned('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => new WChar(x) with Positional))
 
   private def listParser =
-    positioned('(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (x => new AtomList(x.toStream) with Positional))
+    positioned('(' ~> repsep(WParser, singleSpace) ~< ')' ^^ (x => new WList(x.toStream) with Positional))
 
   private def literalListParser =
-    positioned('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ (x => new AtomList(ListMake #:: (x.toStream: Stream[Atom])) with Positional))
+    positioned('[' ~> repsep(WParser, singleSpace) ~< ']' ^^ (x => new WList(ListMake #:: (x.toStream: Stream[W])) with Positional))
 
   // TODO: allow arbitrary base
-  private def numParser = positioned(rep1(digitParser) ^^ (x => new AtomNum(numberListToNumber(x, base = 10)) with Positional))
+  private def numParser = positioned(rep1(digitParser) ^^ (x => new WNum(numberListToNumber(x, base = 10)) with Positional))
 
   private def digitParser: Parser[Int] =
     acceptIf(c => c.isDigit)(c => "Unexpected '" + c + "' when looking for a digit") ^^ (_.asDigit)
 
   private def symbolParser = positioned(rep1(
-    acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ (x => new AtomSym(charListToSymbol(x)) with Positional))
+    acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ (x => new WSym(charListToSymbol(x)) with Positional))
 
   private def special(c: Char) =
     c.isWhitespace || c.isControl ||
@@ -93,7 +93,7 @@ object Reader extends Parsers {
       c == '~' || c == '"' ||
       c == ';' || c == '.'
 
-  private def literalStringParser = '"' ~> rep(insideLiteralParser) ~< '"' ^^ (x => new AtomList(charListToStream(x)) with Positional)
+  private def literalStringParser = '"' ~> rep(insideLiteralParser) ~< '"' ^^ (x => new WList(charListToStream(x)) with Positional)
 
   // TODO: allow string escaping
   private def insideLiteralParser = acceptIf(x => x != '"' && x != '\n')("Unexpected '" + _ + "' when parsing inside a literal string")
@@ -101,7 +101,7 @@ object Reader extends Parsers {
   private def numberListToNumber(nums: List[Int], base: Int) =
     nums.foldLeft(0) { (acc: Int, value: Int) => acc * base + value }
 
-  private def charListToStream(letters: List[Char]) = ListMake #:: (letters.map(new AtomChar(_)).toStream: Stream[Atom])
+  private def charListToStream(letters: List[Char]) = ListMake #:: (letters.map(new WChar(_)).toStream: Stream[W])
   private def charListToSymbol(letters: List[Char]) = Symbol(new String(letters.toArray))
 
   private def eol = elem('\n') // warn if retarded-end line found?
@@ -113,59 +113,5 @@ object Reader extends Parsers {
   implicit private def toUnannoying[T](p: Parser[T]): UnannoyingParser[T] = new UnannoyingParser(p)
   private class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
 
-  import WTypes._
-  import WFunc._
-
-  def startingEnv = Map(
-    // Some pretty primitive stuff
-    Symbol("#eval") -> Eval,
-    Symbol("#if") -> If,
-    Symbol("#vau") -> Vau,
-    // Types
-    Symbol("#Bool") -> TypeBool,
-    Symbol("#Dict") -> TypeDict,
-    Symbol("#Num") -> TypeNum,
-    Symbol("#Sym") -> TypeSym,
-    Symbol("#Type") -> TypeType,
-    Symbol("#type-eq") -> TypeEq,
-    Symbol("#type-of") -> TypeOf,
-    Symbol("#List") -> TypeList,
-    // some num stuff
-    Symbol("#num-add") -> NumAdd,
-    Symbol("#num-div") -> NumDiv,
-    Symbol("#num-eq") -> NumEq,
-    Symbol("#num-gt") -> NumGreaterThan,
-    Symbol("#num-gte") -> NumGreaterThanOrEqual,
-    Symbol("#num-lt") -> NumLessThan,
-    Symbol("#num-lte") -> NumLessThanOrEqual,
-    Symbol("#num-mult") -> NumMult,
-    Symbol("#num-neq") -> NumNeq,
-    Symbol("#num-sub") -> NumSub,
-    Symbol("#num-to-str") -> NumToList,
-    // sym stuff
-    Symbol("#sym-eq") -> SymEq,
-    Symbol("#sym-to-vect") -> SymToVect,
-    // vect functions
-    Symbol("#list-cons") -> ListCons,
-    Symbol("#list-empty") -> ListEmpty,
-    Symbol("#list-length") -> ListLength,
-    Symbol("#list-make") -> ListMake,
-    Symbol("#list-nth") -> ListNth,
-    Symbol("#list-reduce") -> ListReduce,
-    // Dict functions
-    Symbol("#dict-contains") -> DictContains,
-    Symbol("#dict-empty") -> Dict(),
-    Symbol("#dict-get") -> DictGet,
-    Symbol("#dict-insert") -> DictInsert,
-    Symbol("#dict-remove") -> DictRemove,
-    Symbol("#dict-size") -> DictSize,
-    Symbol("#dict-to-list") -> DictToList,
-    // boolean
-    Symbol("#bool-eq") -> BoolEq,
-    Symbol("#bool-false") -> false,
-    Symbol("#bool-not") -> BoolNot,
-    Symbol("#bool-true") -> true,
-    // debug
-    Symbol("#error") -> Error,
-    Symbol("#trace") -> Trace)
+  def startingEnv: Map[Symbol, W] = null
 }
