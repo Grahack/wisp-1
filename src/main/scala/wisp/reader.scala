@@ -11,15 +11,13 @@ object Reader extends Parsers {
 
   type Elem = Char
 
-  def apply(path: Path): (Seq[String], Any) = apply(new String(Files.readAllBytes(path)))
+  def apply(path: Path): Seq[W] = apply(new String(Files.readAllBytes(path)))
 
-  def apply(contents: String): (Seq[String], Any) = {
+  def apply(contents: String): Seq[W with Positional] = {
 
     val csr = new scala.util.parsing.input.CharArrayReader(contents.toCharArray())
 
-    val p = fileParser(csr)
-
-    val forms = p match {
+    fileParser(csr) match {
       case Success(res, next) => {
         if (next.atEnd)
           res
@@ -29,59 +27,54 @@ object Reader extends Parsers {
       case f: Failure => sys.error("Parser failure: " + f.toString)
       case e: Error => sys.error("Parser error: " + e.toString)
     }
-
-    forms.value.headOption match {
-      case Some('import #:: paths) =>
-        require(forms.value.length == 2, "A file with an import, must only have two forms")
-
-        val imports = paths.map(_.asInstanceOf[String])
-
-        (imports -> forms.value.last)
-
-      case _ =>
-        require(forms.value.length == 1, "A file without an import, must only have a single form. Found: " + forms)
-        (Seq() -> forms.value.head)
-    }
   }
-  
-  private def fileParser: Parser[WList] = 
-    positioned(rep(WListParser(0)) ~< rep(eol) ^^ (x => new WList(x.toStream) with Positional))
 
-  private def WListParser(depth: Int): Parser[W] =
+  private def fileParser: Parser[List[W with Positional]] =
+    rep(lineParser(0)) ~< rep(eol)
+
+  private def lineParser(depth: Int): Parser[W with Positional] =
     rep(blankLine) ~>
       repN(depth, '\t') ~>
-      rep1sep(WParser, singleSpace) ~
-      rep(WListParser(depth + 1)) ^^ (x => stitch(x._1, x._2))
+      positioned(
+        rep1sep(atomParser, singleSpace) ~
+          rep(lineParser(depth + 1)) ^^ (x => stitch(x._1, x._2)))
 
-  private def stitch(a: Seq[W], b: Seq[W]) = {
+  private def stitch(a: Seq[W with Positional], b: Seq[W with Positional]) = {
     assert(a.length >= 1)
     if (a.length == 1 && b.length == 0)
       a.head
     else
-      new WList(a.toStream ++ b.toStream)
+      new WList(a.toStream ++ b.toStream) with Positional
   }
 
   private def comment = ';' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
 
-  private def WParser: Parser[W with Positional] =
-    positioned((numParser | charParser | listParser | literalStringParser | literalListParser | symbolParser) ~ opt('.' ~> WParser) ^^
+  private def atomParser: Parser[W with Positional] =
+    positioned((numParser | charParser | listParser | literalStringParser | literalListParser | symbolParser) ~ opt('.' ~> atomParser) ^^
       (x => if (x._2.isDefined) new WList(Stream(x._1, x._2.get)) with Positional else x._1))
 
   private def charParser =
     positioned('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => new WChar(x) with Positional))
 
   private def listParser =
-    positioned('(' ~> repsep(WParser, singleSpace) ~< ')' ^^ (x => new WList(x.toStream) with Positional))
+    positioned('(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (x => new WList(x.toStream) with Positional))
 
-  private def literalListParser =
-    positioned('[' ~> repsep(WParser, singleSpace) ~< ']' ^^ (x => new WList(ListMake #:: (x.toStream: Stream[W])) with Positional))
+  private def literalListParser = {
+      val tmp = new ListMake {} // compiler bug work-around
+      positioned('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ (x => new WList(tmp #:: (x.toStream: Stream[W])) with Positional))
+  }
 
   // TODO: allow arbitrary base
   private def numParser = positioned(rep1(digitParser) ^^ (x => new WNum(numberListToNumber(x, base = 10)) with Positional))
 
   private def digitParser: Parser[Int] =
     acceptIf(c => c.isDigit)(c => "Unexpected '" + c + "' when looking for a digit") ^^ (_.asDigit)
+
+  //  private def builtInParser = WBuiltIn.all.map {
+  //    x => accept( x.name.name.toList) ^^ (_ => x)
+  //  }.reduce((a,b) => a|b)
+  //
 
   private def symbolParser = positioned(rep1(
     acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ (x => new WSym(charListToSymbol(x)) with Positional))
@@ -101,7 +94,7 @@ object Reader extends Parsers {
   private def numberListToNumber(nums: List[Int], base: Int) =
     nums.foldLeft(0) { (acc: Int, value: Int) => acc * base + value }
 
-  private def charListToStream(letters: List[Char]) = ListMake #:: (letters.map(new WChar(_)).toStream: Stream[W])
+  private def charListToStream(letters: List[Char]) = new ListMake {} #:: (letters.map(new WChar(_)).toStream: Stream[W])
   private def charListToSymbol(letters: List[Char]) = Symbol(new String(letters.toArray))
 
   private def eol = elem('\n') // warn if retarded-end line found?

@@ -49,22 +49,22 @@ Valid options are:
   }
 
   def loadAll(current: Dag[Path, Any], path: Path, verbose: Boolean): Dag[Path, Any] = {
-
-    if (verbose)
-      println("Loading file: " + path)
-
-    val (imports, value) = Reader(path)
-
-    val importPaths = imports.map(path.resolveSibling(_)).toSet // TODO: check for dupes ?
-
-    importPaths.foldLeft(current.add(path, value, importPaths)) {
-      (a, b) =>
-        if (!a.payload.contains(b))
-          loadAll(a, b, verbose)
-        else
-          a
-    }
-
+//
+//    if (verbose)
+//      println("Loading file: " + path)
+//
+//    val (imports, value) = Reader(path)
+//
+//    val importPaths = imports.map(path.resolveSibling(_)).toSet // TODO: check for dupes ?
+//
+//    importPaths.foldLeft(current.add(path, value, importPaths)) {
+//      (a, b) =>
+//        if (!a.payload.contains(b))
+//          loadAll(a, b, verbose)
+//        else
+//          a
+//    }
+    null
   }
 
   def runDag(dag: Dag[Path, Any], verbose: Boolean): Any = {

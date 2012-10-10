@@ -1,79 +1,64 @@
 package wisp
 
 import scala.collection.immutable.HashMap
+import scala.util.parsing.input.Positional
 
 trait W {
-  def summary: String
+  def verbose: String = summary
+  def summary: String = name
+  def name: String = this.getClass().toString()
 
-  def rawBool: Boolean = err
-  def rawChar: Char = err
-  def rawDict: HashMap[W, W] = err
-  def rawList: Stream[W] = err
-  def rawAst: WList = err
-  def rawNum: Int = err
-  def rawSym: Symbol = err
-  def rawType: WTypes.WType = err
+  def execute(fn: WList): W = err
+  def getAst: Stream[W] = err
+  def hostBool: Boolean = err
+  def hostChar: Char = err
+  def hostDict: HashMap[W, W] = err
+  def hostList: Stream[W] = err
+  def hostNum: Int = err
+  def hostSym: Symbol = err
+  def hostType: WTypes.WType = err
 
-  def err = sys.error("Operation not supported on: " + summary)
+  protected def err = sys.error("Operation not supported on: " + summary)
 }
 
-object WFalse extends W {
-  def summary = "#False"
-  override def rawBool = false
-  def value = false
-  override def equals(o: Any) = {
-    o match {
-      case WFalse => true
-      case false => true
-      case _ => false
-    }
-  }
-}
-
-object WTrue extends W {
-  def summary = "#True"
-  override def rawBool = true
-  def value = true
-  override def equals(o: Any) = {
-    o match {
-      case WTrue => true
-      case true => true
-      case _ => false
-    }
-  }
-}
-
-object WBool {
-  def apply(value: Boolean) = if (value) WTrue else WFalse
+class WBool(value: Boolean) extends W {
+  override def name = if (value) "True" else "False"
+  override def hostBool = value
 }
 
 class WChar(val value: Char) extends W {
-  def summary = "~" + value
-  override def rawChar = value
-  override def equals(o: Any) = {
-    o match {
-      case o: WChar => value == o.value
-      case i: Char => value == i
-      case _ => false
-    }
+  override def name = "~" + value
+  override def hostChar = value
+  override def equals(o: Any) = o match {
+    case o: WChar => value == o.value
+    case i: Char => value == i
+    case _ => false
   }
 }
 
 class WDict(val value: HashMap[W, W]) extends W {
-  def summary = "{ map of size: " + value.size + "}"
-  override def rawDict = value
+  override def summary = "{Dict of " + value.size + "}"
+  override def name = "Dict"
+  override def hostDict = value
   override def equals(o: Any) =
     o match {
-      case l: WDict => value == l.value
+      case d: WDict => value == d.value
       case i: HashMap[_, _] => value == i
       case _ => false
     }
 }
 
+object FnArgs {
+  def unapplySeq(w: WList) = {
+    assert(!w.value.isEmpty)
+    Stream.unapplySeq(w.value.tail)
+  }
+}
+
 // TODO: Once everything is working and tested, we should be able to make a significantly more efficient version of stream
 class WList(val value: Stream[W]) extends W {
-  def summary = value.toString() // TODO: truncate if > a certain amount
-  override def rawList = value
+  override def name = "List"
+  override def hostList = value
   override def equals(o: Any) =
     o match {
       case l: WList => value == l.value
@@ -83,15 +68,16 @@ class WList(val value: Stream[W]) extends W {
 }
 
 // TODO: don't use a string for debug info, lol
-class WParamList(debugInfo: String, env: HashMap[W,W], unevaldArgs: Stream[W]) extends W {
-  def summary = "{PL: " + debugInfo + " preeval: " + unevaldArgs + "}"
-  override def rawList = unevaldArgs.map(Interpretter.eval(_, env))
-  override def rawAst = new WList(unevaldArgs)
+class WParamList(debugInfo: String, env: HashMap[W, W], unevaldArgs: Stream[W]) extends W {
+  override def summary = "{PL: " + debugInfo + " preeval: " + unevaldArgs + "}"
+  override def name = "ParamList"
+  override def getAst = unevaldArgs
+  override def hostList = unevaldArgs.map(Interpretter.eval(_, env))
 }
 
 class WNum(val value: Int) extends W {
-  def summary = value.toString()
-  override def rawNum = value
+  override def name = value.toString()
+  override def hostNum = value
   override def equals(o: Any) = o match {
     case n: WNum => value == n.value
     case i: Int => value == i
@@ -100,8 +86,8 @@ class WNum(val value: Int) extends W {
 }
 
 class WSym(val value: Symbol) extends W {
-  def summary = value.toString() // TODO: truncate if > a certain amount
-  override def rawSym = value
+  override def name = value.toString()
+  override def hostSym = value
   override def equals(o: Any) =
     o match {
       case as: WSym => value == as.value
@@ -112,20 +98,16 @@ class WSym(val value: Symbol) extends W {
 
 // primitive
 
-object WEval extends W {
-  def summary = "#eval"
+trait WEval extends W {
+  override def summary = "WEval"
 }
 
 object WIf extends W {
-  def summary = "#if"
+  override def name = "if"
 }
 
-object WLambda extends W {
-  def summary = "#vau"
-}
-
-case class WLambdaRun(capEnv: HashMap[W,W], argS: WSym, capCode: W) extends W {
-  override def summary = "$vau$"
+case class WLambdaRun(capEnv: HashMap[W, W], argS: WSym, capCode: W) extends W {
+  override def name = "$UDF$"
 }
 
 object WTypes extends Enumeration {
@@ -134,8 +116,8 @@ object WTypes extends Enumeration {
 }
 
 class WType(val value: WTypes.WType) extends W {
-  def summary = "Type: " + value.toString
-  override def rawType = value
+  override def name = "{Type: " + value.toString + "}"
+  override def hostType = value
   override def equals(o: Any) =
     o match {
       case at: WType => value == at.value
@@ -144,194 +126,176 @@ class WType(val value: WTypes.WType) extends W {
     }
 }
 
-object WFunc {
-  var subClasses: Set[WFunc] = Set()
+trait DerivedFrom {
+  def from: W
 }
 
-abstract class WFunc extends W {
-  register()
-
-  def summary = name.toString
-  def name: Symbol
-  def value = this
-  
-  def apply(s: Stream[W]): W = {
-    require(run.isDefinedAt(s), "Function: " + summary + " couldn't accept the arguments: " + s)
-    run(s)
+trait WFunc extends W {
+  override def execute(fn: WList) = fn.value match {
+    case Stream(_, a) => execute1(fn, a)
+    case Stream(_, a, b) => execute2(fn, a, b)
+    case Stream(_, a, b, c) => execute3(fn, a, b, c)
   }
-
-  protected def run: PartialFunction[Stream[W], W]
-
-  protected def register() { WFunc.subClasses = WFunc.subClasses + this } // this is stupidly hacky...
+  def execute1(fn: WList, a: W): W = err
+  def execute2(fn: WList, a: W, b: W): W = err
+  def execute3(fn: WList, a: W, b: W, c: W): W = err
 }
 
-object AstOf extends WFunc {
-  def name = Symbol("#ast-of")
-  def run = { case Stream(a) => a.rawAst }
+trait WLambda extends W {
+  override def name = "lambda"
+  //  override def execute(fn: WList) = {
+  //    FnCall(argS: WSym, code: W) =>
+  //              require(!e.contains(argS), "Can't use symbol " + argS + " for binding an argument list, as it already exists")
+  //              WLambdaRun(e, argS, code)
+  //          }
 }
 
-object TypeEq extends WFunc {
-  def name = Symbol("#TypeEq")
-  def run = { case Stream(a, b) => WBool(a.rawType == b.rawType) }
+trait AstOf extends WFunc {
+  override def execute1(fn: WList, a: W) = new WList(a.getAst) with DerivedFrom { def from = fn }
 }
 
-object TypeOf extends WFunc {
-  def name = Symbol("#TypeOf")
-  def run = { case Stream(a) => new WType(a.rawType) } // TODO: this is totally wrong
+trait TypeEq extends WFunc {
+  override def execute2(fn: WList, a: W, b: W) = new WBool(a.hostType == b.hostType) with DerivedFrom { def from = fn }
+}
+
+trait TypeOf extends WFunc {
+  override def execute2(fn: WList, a: W, b: W) = new WType(a.hostType) with DerivedFrom { def from = fn } // TODO: this is totally wrong
 }
 
 // boolean
 
-object BoolNot extends WFunc {
-  def name = Symbol("#bool-not")
-  def run = { case Stream(a) => WBool(!a.rawBool) }
+trait BoolNot extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(a) => new WBool(!a.hostBool) with DerivedFrom { def from = fn } }
 }
 
-object BoolEq extends WFunc {
-  def name = Symbol("#bool-eq")
-  def run = { case Stream(a, b) => WBool(a.rawBool == a.rawBool) }
+trait BoolEq extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(a, b) => new WBool(a.hostBool == a.hostBool) with DerivedFrom { def from = fn } }
 }
 
 // num
 
-object NumAdd extends WFunc {
-  def name = Symbol("#num-add")
-  def run = { case Stream(a, b) => new WNum(a.rawNum + b.rawNum) }
+trait NumAdd extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(a, b) => new WNum(a.hostNum + b.hostNum) with DerivedFrom { def from = fn } }
 }
-object NumDiv extends WFunc {
-  def name = Symbol("#num-div")
-  def run = { case Stream(a, b) => new WNum(a.rawNum / b.rawNum) }
+
+trait NumDiv extends WFunc {
+  override def execute2(fn: WList, a: W, b: W) = new WNum(a.hostNum / b.hostNum) with DerivedFrom { def from = fn }
 }
-object NumGT extends WFunc {
-  def name = Symbol("#num-gt")
-  def run = { case Stream(a, b) => WBool(a.rawNum > b.rawNum) }
+
+trait NumGT extends WFunc {
+  override def execute2(fn: WList, a: W, b: W) = new WBool(a.hostNum > b.hostNum) with DerivedFrom { def from = fn }
 }
-object NumGTE extends WFunc {
-  def name = Symbol("#num-gte")
-  def run = { case Stream(a, b) => WBool(a.rawNum >= b.rawNum) }
+
+trait NumGTE extends WFunc {
+  override def execute2(fn: WList, a: W, b: W) = new WBool(a.hostNum >= b.hostNum) with DerivedFrom { def from = fn }
 }
-object NumEq extends WFunc {
-  def name = Symbol("num-eq")
-  def run = { case Stream(a, b) => WBool(a.rawNum == b.rawNum) }
+
+trait NumEq extends WFunc {
+  override def execute2(fn: WList, a: W, b: W) = new WBool(a.hostNum == b.hostNum) with DerivedFrom { def from = fn }
 }
-object NumLT extends WFunc {
-  def name = Symbol("#num-lt")
-  def run = { case Stream(a, b) => WBool(a.rawNum < b.rawNum) }
+
+trait NumLT extends WFunc {
+  override def execute2(fn: WList, a: W, b: W) = new WBool(a.hostNum < b.hostNum) with DerivedFrom { def from = fn }
 }
-object NumLTE extends WFunc {
-  def name = Symbol("#num-lt")
-  def run = { case Stream(a, b) => WBool(a.rawNum <= b.rawNum) }
+
+trait NumLTE extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(a, b) => new WBool(a.hostNum <= b.hostNum) with DerivedFrom { def from = fn } }
 }
-object NumMult extends WFunc {
-  def name = Symbol("#num-mult")
-  def run = { case Stream(a, b) => new WNum(a.rawNum * b.rawNum) }
+
+trait NumMult extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(a, b) => new WNum(a.hostNum * b.hostNum) with DerivedFrom { def from = fn } }
 }
-object NumSub extends WFunc {
-  def name = Symbol("#num-sub")
-  def run = { case Stream(a, b) => new WNum(a.rawNum - b.rawNum) }
+
+trait NumSub extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(a, b) => new WNum(a.hostNum - b.hostNum) with DerivedFrom { def from = fn } }
 }
-object NumToList extends WFunc {
-  def name = Symbol("#num-to-list")
-  def run = { case Stream(a) => new WList(a.rawNum.toString.map(x => new WChar(x)).toStream) }
+
+trait NumToList extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(a) => new WList(a.hostNum.toString.map(x => new WChar(x)).toStream) with DerivedFrom { def from = fn } }
 }
 
 // sym stuff
 
-object SymEq extends WFunc {
-  def name = Symbol("#sym-eq")
-  def run = { case Stream(a, b) => WBool(a.rawSym == b.rawSym) }
+trait SymEq extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(a, b) => new WBool(a.hostSym == b.hostSym) with DerivedFrom { def from = fn } }
 }
 
-object SymToList extends WFunc {
-  def name = Symbol("#sym-to-list")
-  def run = { case Stream(list) => new WList(list.rawSym.name.map(x => new WChar(x)).toStream) }
+trait SymToList extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(list) => new WList(list.hostSym.name.map(x => new WChar(x)).toStream) with DerivedFrom { def from = fn } }
 }
 
 // list stuff
 
-object ListCons extends WFunc {
-  def name = Symbol("#list-cons")
-  def run = { case Stream(list, value) => new WList(value #:: list.rawList) }
+trait ListCons extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(list, value) => new WList(value #:: list.hostList) with DerivedFrom { def from = fn } }
 }
 
-object ListIsEmpty extends WFunc {
-  def name = Symbol("#list-empty?")
-  def run = { case Stream(list) => WBool(list.rawList.isEmpty) }
+trait ListHead extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(list) => list.hostList.head }
+}
+
+trait ListIsEmpty extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(list) => new WBool(list.hostList.isEmpty) with DerivedFrom { def from = fn } }
 }
 
 // TODO: this is for convenience, remove later
-object ListLength extends WFunc {
-  def name = Symbol("#list-length")
-  def run = { case Stream(list) => new WNum(list.rawList.length) }
+trait ListLength extends WFunc {
+  override def execute(fn: WList) = fn match { case FnArgs(list) => new WNum(list.hostList.length) with DerivedFrom { def from = fn } }
 }
 
-object ListMake extends WFunc {
-  def name = Symbol("#list-make")
-  def run = { case list => new WList(list) }
+trait ListMake extends WFunc {
+  override def execute(fn: WList) = new WList(fn.value.tail) with DerivedFrom { def from = fn } // the head is #ListMake part
+  override def equals(o: Any) = o.isInstanceOf[ListMake] // testing hack
 }
 
 // TODO: this should be removed, it's just for convenience
-object ListNth extends WFunc {
-  def name = Symbol("#list-nth")
-  def run = { case Stream(list, i) => list.rawList(i.rawNum) }
+trait ListNth extends WFunc {
+  override def execute2(fn: WList, list: W, i: W) = list.hostList(i.hostNum)
 }
 
-object ListTail extends WFunc {
-  def name = Symbol("#list-tail")
-  def run = { case list => new WList(list.tail) }
+trait ListTail extends WFunc {
+  override def execute1(fn: WList, list: W) = new WList(list.hostList.tail) with DerivedFrom { def from = fn }
 }
 
-object DictContains extends WFunc {
-  def name = Symbol("#dict-contains")
-  def run = { case Stream(dict, key) => WBool(dict.rawDict.contains(key)) }
+trait DictContains extends WFunc {
+  override def execute2(fn: WList, dict: W, key: W) = new WBool(dict.hostDict.contains(key)) with DerivedFrom { def from = fn }
 }
 
-object DictGet extends WFunc {
-  def name = Symbol("#dict-get")
-  def run = { case Stream(dict, key) => dict.rawDict(key) }
+trait DictGet extends WFunc {
+  override def execute2(fn: WList, dict: W, key: W) = dict.hostDict(key)
 }
 
-object DictInsert extends WFunc {
-  def name = Symbol("#dict-insert")
-  def run = {
-    case Stream(dict, key, value) =>
-      val d = dict.rawDict
-      require(!d.contains(key))
-      new WDict(d + (key -> value))
+trait DictInsert extends WFunc {
+  override def execute3(fn: WList, dict: W, key: W, value: W) = {
+    val d = dict.hostDict
+    require(!d.contains(key))
+    new WDict(d + (key -> value)) with DerivedFrom { def from = fn }
   }
 }
 
-object DictRemove extends WFunc {
-  def name = Symbol("#dict-remove")
-  def run = {
-    case Stream(dict, key) =>
-      val d = dict.rawDict
-      require(d.contains(key))
-      new WDict(d - key)
+trait DictRemove extends WFunc {
+  override def execute2(fn: WList, dict: W, key: W) = {
+    val d = dict.hostDict
+    require(d.contains(key))
+    new WDict(d - key) with DerivedFrom { def from = fn }
   }
 }
 
-object DictSize extends WFunc {
-  def name = Symbol("#dict-size")
-  def run = { case Stream(dict) => new WNum(dict.rawDict.size) }
+trait DictSize extends WFunc {
+  override def execute1(fn: WList, dict: W) = new WNum(dict.hostDict.size) with DerivedFrom { def from = fn }
 }
 
-object DictToList extends WFunc {
-  def name = Symbol("#dict-to-list")
-  def run = { case Stream(dict) => new WList(dict.rawDict.toStream.map(x => new WList(Stream(x._1, x._2)))) }
+trait DictToList extends WFunc {
+  override def execute1(fn: WList, dict: W) = new WList(dict.hostDict.toStream.map(x => new WList(Stream(x._1, x._2)))) with DerivedFrom { def from = fn }
 }
 
-object Trace extends WFunc {
-  def name = Symbol("#trace")
-  def run = {
-    case x =>
-      import scala.util.parsing.input.Positional
-      println("Tracing: {" + x.map(_.summary).mkString(";") + "}" + (if (x.isInstanceOf[Positional]) (" pos: " + x.asInstanceOf[Positional].pos.longString) else ""))
-      new WList(Stream())
+trait Trace extends WFunc {
+  override def execute(fn: WList) = {
+    println("Tracing: " + fn.summary)
+    new WList(Stream()) with DerivedFrom { def from = fn }
   }
 }
 
-object Error extends WFunc {
-  def name = Symbol("#error")
-  def run = { case _ => sys.error("Code Error") } // TODO: better info
+trait Error extends WFunc {
+  override def execute(fn: WList) = sys.error("Code Error." + fn.summary) // TODO: better info
 }

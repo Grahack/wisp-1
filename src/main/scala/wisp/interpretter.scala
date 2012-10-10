@@ -22,18 +22,13 @@ object Interpretter {
           case WLambdaRun(capEnv, argS, capCode) =>
             eval(capCode, capEnv + (argS -> new WParamList("{rawFunc: " + fn.summary + "}", e, rawArgs)))
 
-          case WLambda => rawArgs match {
-            case Stream(argS: WSym, code: W) =>
-              require(!e.contains(argS), "Can't use symbol " + argS + " for binding an argument list, as it already exists")
-              WLambdaRun(e, argS, code)
-          }
           case WIf => rawArgs match {
             case Stream(cond, trueCase, falseCase) =>
-              if (eval(cond, e).rawBool) eval(trueCase,e) else eval(falseCase,e)
+              if (eval(cond, e).hostBool) eval(trueCase,e) else eval(falseCase,e)
             case x =>
               sys.error("Trying to call if without (if trueCase falseCase): " + rawArgs)
           }
-          case wf: WFunc => wf(rawArgs.map(eval(_, e)))
+         // case wf: WFunc => wf(rawArgs.map(eval(_, e)))
           case x => sys.error("Can't evaluate: " + x.summary + " as a function")
         }
       case x => x
