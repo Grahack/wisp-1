@@ -71,14 +71,14 @@ Valid options are:
 
     val data = dag.topologicalSort.reverse.map(x => x -> dag.payload(x))
 
-    val r = data.foldLeft(Reader.startingEnv: Any) {
+    val r = data.foldLeft(Map(): Any) {
       case (env, (path, form)) =>
         require(env.isInstanceOf[WDict], "Expected the result of an import to give us an environment, instead found: " + env)
 
         if (verbose)
           println("About to interpret file: " + path)
 
-        val (result, t) = timeFunc(Interpretter(/*form*/null, env.asInstanceOf[WDict].value))
+        val (result, t) = timeFunc(Interpretter.eval(/*form*/null, env.asInstanceOf[WDict].value))
 
         if (verbose)
           println("..took " + t)

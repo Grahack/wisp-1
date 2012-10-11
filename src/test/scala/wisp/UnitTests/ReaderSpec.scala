@@ -71,9 +71,9 @@ class ReaderSpec extends Specification {
       //read
 
       read("(f (a b) c)") must_== List('f, List('a, 'b), 'c)
-     // read("(f a ") must throwA
-     // read("f a a)") must throwA
-     // read("(f (a a)") must throwA
+      read("(f a ") must throwA
+      read("f a a)") must throwA
+      read("(f (a a)") must throwA
     }
 
     "work with leading/trailing slines" in {
@@ -101,6 +101,15 @@ class ReaderSpec extends Specification {
          |		g h
          |	i""".stripMargin) must_== read("(f a b ((c d) e f (g h)) i)")
 
+    }
+
+    "reads builtins" in {
+      read("#num-add") must beAnInstanceOf[NumAdd]
+      read("#list-make") must beAnInstanceOf[ListMake]
+
+      val pos = read("\n#ListHead\n\t#ListHead").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
+      pos.line must_== 3
+      pos.column must_== 2
     }
   }
 
