@@ -102,7 +102,6 @@ object Reader extends Parsers {
   private def singleSpace = elem(' ')
 
   // get around annoying precedent rule of <~
-  import scala.language.implicitConversions
   implicit private def toUnannoying[T](p: Parser[T]): UnannoyingParser[T] = new UnannoyingParser(p)
   private class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
 
