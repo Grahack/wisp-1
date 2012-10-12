@@ -18,7 +18,7 @@ object Interpretter {
       val fn #:: rawArgs = fnCall.value
 
       eval(fn, e) match {
-        // in order to tail call these, can't just dynamic-dispatch out
+        // in order to tail call if/eval, can't just dynamic-dispatch out
 
         case WLambdaRun(capEnv, argS, capCode) =>
           eval(capCode, capEnv + (argS -> new WParamList("{rawFunc: " + fn.summary + "}", e, rawArgs)))
@@ -31,12 +31,7 @@ object Interpretter {
             eval(falseCase, e)
         }
 
-        case wf => rawArgs match {
-          case Stream(a) => wf.execute1(fnCall, eval(a, e))
-          case Stream(a, b) => wf.execute2(fnCall, eval(a, e), eval(b, e))
-          case Stream(a, b, c) => wf.execute3(fnCall, eval(a, e), eval(b, e), eval(c, e))
-          case _ => wf.executeN(fnCall, rawArgs.map(eval(_, e)))
-        }
+        case wf => wf.execute(fnCall, rawArgs.map(eval(_, e)))
       }
     case x => x
   }

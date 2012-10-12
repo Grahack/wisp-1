@@ -29,7 +29,7 @@ object Reader extends Parsers {
     }
   }
 
-  private def fileParser: Parser[List[W with Positional]] =
+  private def fileParser: Parser[Seq[W with Positional]] =
     rep(lineParser(0)) ~< rep(eol)
 
   private def lineParser(depth: Int): Parser[W with Positional] =
