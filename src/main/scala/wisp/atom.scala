@@ -16,6 +16,7 @@ trait W {
   def hostNum: Int = err
   def hostSym: Symbol = err
   def hostType: WTypes.WType = err
+  def hostVect: IndexedSeq[W] = err
 
   def execute(fn: WList, args: Stream[W]): W = err
 
@@ -63,7 +64,6 @@ class WList(val value: Stream[W]) extends W {
     o match {
       case l: WList => value == l.value
       case s: Seq[_] => value == s
-      case st: String => value == st.toStream
       case _ => false
     }
 }
@@ -74,6 +74,18 @@ class WParamList(debugInfo: String, env: HashMap[W, W], unevaldArgs: Stream[W]) 
   override def name = "ParamList"
   override def getAst = unevaldArgs
   override def hostList = unevaldArgs.map(Interpretter.eval(_, env))
+}
+
+class WVect(val value: IndexedSeq[W]) extends W {
+  override def name = "Vector"
+  override def hostVect = value
+  override def equals(o: Any) =
+    o match {
+      case l: WVect => value == l.value
+      case s: Seq[_] => value == s
+      case st: String => value == st.toSeq
+      case _ => false
+    }
 }
 
 class WNum(val value: Int) extends W {
@@ -288,31 +300,55 @@ trait ListIsEmpty extends W {
   }
 }
 
-// TODO: this is for convenience, remove later
-trait ListLength extends W {
-  override def execute(fn: WList, args: Stream[W]) = {
-    val Stream(list) = args
-    new WNum(list.hostList.length) with DerivedFrom { def from = fn }
-  }
-}
-
 trait ListMake extends W {
-  override def execute(fn: WList, args: Stream[W]) = new WList(args) with DerivedFrom { def from = fn }
-  override def equals(o: Any) = o.isInstanceOf[ListMake] // testing hack
-}
-
-// TODO: this should be removed, it's just for convenience
-trait ListNth extends W {
-  override def execute(fn: WList, args: Stream[W]) = {
-    val Stream(list, index) = args
-    list.hostList(index.hostNum)
-  }
+  override def execute(fn: WList, args: Stream[W]) =
+    new WList(args) with DerivedFrom { def from = fn }
 }
 
 trait ListTail extends W {
   override def execute(fn: WList, args: Stream[W]) = {
     val Stream(list) = args
     new WList(list.hostList.tail) with DerivedFrom { def from = fn }
+  }
+}
+
+trait VectAppend extends W {
+  override def execute(fn: WList, args: Stream[W]) = {
+    val Stream(list, value) = args
+    new WVect(list.hostVect :+ value) with DerivedFrom { def from = fn }
+  }
+}
+
+trait VectLength extends W {
+  override def execute(fn: WList, args: Stream[W]) = {
+    val Stream(list) = args
+    new WNum(list.hostVect.length) with DerivedFrom { def from = fn }
+  }
+}
+
+trait VectMake extends W {
+  override def execute(fn: WList, args: Stream[W]) =
+    new WVect(args.toIndexedSeq) with DerivedFrom { def from = fn }
+}
+
+trait VectNth extends W {
+  override def execute(fn: WList, args: Stream[W]) = {
+    val Stream(vect, index) = args
+    vect.hostVect(index.hostNum)
+  }
+}
+
+trait VectPrepend extends W {
+  override def execute(fn: WList, args: Stream[W]) = {
+    val Stream(vect, value) = args
+    new WVect(value +: vect.hostVect) with DerivedFrom { def from = fn }
+  }
+}
+
+trait VectToList extends W {
+  override def execute(fn: WList, args: Stream[W]) = {
+    val Stream(vect) = args
+    new WList(vect.hostVect.toStream) with DerivedFrom { def from = fn }
   }
 }
 

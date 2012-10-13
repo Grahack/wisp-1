@@ -40,8 +40,8 @@ class ReaderSpec extends Specification {
 
     }
     "be able to read a string" in {
-      read("\"soup\"") must_== List(new ListMake {}, 's', 'o', 'u', 'p')
-      read("\"\"") must_== List(new ListMake {})
+      read("\"soup\"") must_== "soup"
+      read("\"\"") must_== ""
 
       val pos = read("100 \"robbers\"").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
 
@@ -54,12 +54,8 @@ class ReaderSpec extends Specification {
       read("~a ~b ~3 ~d ~e ~f") must_== List('a', 'b', '3', 'd', 'e', 'f')
     }
     "work with convenience quoted lists" in {
-      try {
-        read("[a b c]")
-      } catch {
-        case x: Throwable => println("Caught1: " + x); sys.error("wtf")
-      }
-      ok //must_== List(new ListMake {}, 1, 2, 3)
+      read("[a b c]") must_== Seq('a, 'b, 'c)
+      read("[a [b 4]]") must_== Seq('a, Seq('b, 4))
     }
     "handle explicit function calls / lists" in {
       read("(f a b)") must_== List('f, 'a, 'b)
