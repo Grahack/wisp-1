@@ -61,11 +61,11 @@ object Reader extends Parsers {
     positioned('(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (x => new WList(x.toStream) with Positional))
 
   private def literalVectParser = {
-    positioned('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ (x => new WVect(x.toIndexedSeq) with Positional))
+    positioned('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ (x => new Vect(x.toIndexedSeq) with Positional))
   }
 
   // TODO: allow arbitrary base
-  private def numParser = positioned(rep1(digitParser) ^^ (x => new WNum(numberListToNumber(x, base = 10)) with Positional))
+  private def numParser = positioned(rep1(digitParser) ^^ (x => new Num(numberListToNumber(x, base = 10)) with Positional))
 
   private def digitParser: Parser[Int] =
     acceptIf(c => c.isDigit)(c => "Unexpected '" + c + "' when looking for a digit") ^^ (_.asDigit)
@@ -76,7 +76,7 @@ object Reader extends Parsers {
   //
 
   private def symbolParser = positioned(rep1(
-    acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ (x => new WSym(charListToSymbol(x)) with Positional))
+    acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ (x => new Sym(charListToSymbol(x)) with Positional))
 
   private def special(c: Char) =
     c.isWhitespace || c.isControl ||
@@ -85,7 +85,7 @@ object Reader extends Parsers {
       c == '~' || c == '"' ||
       c == ';' || c == '.'
 
-  private def literalStringParser = '"' ~> rep(positioned(insideLiteralParser)) ~< '"' ^^ (x => new WVect(x.toIndexedSeq) with Positional)
+  private def literalStringParser = '"' ~> rep(positioned(insideLiteralParser)) ~< '"' ^^ (x => new Vect(x.toIndexedSeq) with Positional)
 
   // TODO: allow string escaping
   private def insideLiteralParser = acceptIf(x => x != '"' && x != '\n')("Unexpected '" + _ + "' when parsing inside a literal string") ^^ (new WChar(_) with Positional)
@@ -107,11 +107,14 @@ object Reader extends Parsers {
     acceptSeq(s) ^^ (_ => exp)
 
   private def builtInSymbolParser =
-    bm("#True", new WBool(true) with Positional) |
-      bm("#False", new WBool(false) with Positional) |
-      bm("#eval", new WEval with Positional) |
-      bm("#if", new WIf with Positional) |
+    bm("#True", new Bool(true) with Positional) |
+      bm("#False", new Bool(false) with Positional) |
       bm("#ast", new AstOf with Positional) |
+      bm("#env", new EnvOf with Positional) |
+      bm("#eval", new Eval with Positional) |
+      bm("#lambda", new Lambda with Positional) |
+      bm("#if", new If with Positional) |
+      bm("#quote", new Quote with Positional) |
       bm("#type-eq", new TypeEq with Positional) |
       bm("#type-of", new TypeOf with Positional) |
       bm("#bool-not", new BoolNot with Positional) |
@@ -145,6 +148,6 @@ object Reader extends Parsers {
       bm("#dict-remove", new DictRemove with Positional) |
       bm("#dict-size", new DictSize with Positional) |
       bm("#dict-to-list", new DictToList with Positional) |
-      bm("#trace", new DictContains with Positional) |
-      bm("#error", new DictContains with Positional)
+      bm("#trace", new Trace with Positional) |
+      bm("#error", new WError with Positional)
 }

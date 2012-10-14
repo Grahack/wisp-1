@@ -42,6 +42,7 @@ class ReaderSpec extends Specification {
     "be able to read a string" in {
       read("\"soup\"") must_== "soup"
       read("\"\"") must_== ""
+      read("\"tiger\"") must_== read("[~t ~i ~g ~e ~r]")
 
       val pos = read("100 \"robbers\"").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
 

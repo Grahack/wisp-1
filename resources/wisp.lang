@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<language id="wisp" _name="Wisp" version="2.0" _section="Sources">
+  <metadata>
+    <property name="mimetypes">text/x-wisp</property>
+    <property name="globs">*.wisp</property>
+    <property name="line-comment-start">;</property>
+  </metadata>
+
+  <styles>
+    <style id="comment" _name="Comment" map-to="def:comment"/>
+    <style id="string" _name="String" map-to="def:string"/>
+    <style id="keyword" _name="Keyword" map-to="def:keyword"/>
+  </styles>
+
+  <definitions>
+    <context id="line-comment" style-ref="comment" end-at-line-end="true" class="comment" class-disabled="no-spell-check">
+      <start>;</start>
+      <include>
+        <context ref="def:in-comment"/>
+      </include>
+    </context>
+
+    <context id="string" style-ref="string" class="string" class-disabled="no-spell-check">
+      <start>"</start>
+      <end>"</end>
+      <include>
+        <context ref="def:escape"/>
+      </include>
+    </context>
+
+    <context id="keyword" style-ref="keyword">
+      <prefix>#</prefix> 
+      <keyword>True</keyword>
+      <keyword>False</keyword>
+      <keyword>ast</keyword>
+      <kewyword>env</kworyd>
+      <keyword>eval</keyword>
+      <keyword>lambda</keyword>
+      <keyword>if</keyword>
+      <keyword>quote</keyword>
+      <keyword>type-eq</keyword>
+      <keyword>type-of</keyword>
+      <keyword>bool-not</keyword>
+      <keyword>bool-eq</keyword>
+      <keyword>num-add</keyword>
+      <keyword>num-div</keyword>
+      <keyword>num-gt</keyword>
+      <keyword>num-gte</keyword>
+      <keyword>num-eq</keyword>
+      <keyword>num-lt</keyword>
+      <keyword>num-lte</keyword>
+      <keyword>num-mult</keyword>
+      <keyword>num-sub</keyword>
+      <keyword>num-to-char-list</keyword>
+      <keyword>sym-eq</keyword>
+      <keyword>sym-to-char-list</keyword>
+      <keyword>list-cons</keyword>
+      <keyword>list-head</keyword>
+      <keyword>list-empty?</keyword>
+      <keyword>list-make</keyword>
+      <keyword>list-tail</keyword>
+      <keyword>vect-append</keyword>
+      <keyword>vect-lengt</keyword>
+      <keyword>vect-make</keyword>
+      <keyword>vect-nth</keyword>
+      <keyword>vect-prepend</keyword>
+      <keyword>vect-to-list</keyword>
+      <keyword>dict-contains</keyword>
+      <keyword>dict-get</keyword>
+      <keyword>dict-insert</keyword>
+      <keyword>dict-remove</keyword>
+      <keyword>dict-size</keyword>
+      <keyword>dict-to-list</keyword>
+      <keyword>trace</keyword>
+      <keyword>error</keyword>
+    </context>
+
+    <context id="wisp" class="no-spell-check">
+      <include>
+        <context ref="line-comment"/>
+        <context ref="string"/>
+        <context ref="keyword"/>
+      </include>
+    </context>
+
+  </definitions>
+</language>

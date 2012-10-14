@@ -33,9 +33,8 @@ Valid options are:
   -v        Verbose. Output some verbose information, such as
             awesome ascii-art dependency graphs. """)
     } else {
-      val path = Paths.get(rest.head)
 
-      val dag = loadAll(Dag[Path, Any](), path, verbose)
+      val dag = Loader(rest.head, verbose)
 
       if (verbose)
         println("File dependency graph:\n" + dag.toAscii)
@@ -43,61 +42,34 @@ Valid options are:
       if (watch)
         runWatch(dag, verbose)
       else
-        runDag(dag, verbose)
+        runDag(dag)
 
     }
   }
 
-  def loadAll(current: Dag[Path, Any], path: Path, verbose: Boolean): Dag[Path, Any] = {
-//
-//    if (verbose)
-//      println("Loading file: " + path)
-//
-//    val (imports, value) = Reader(path)
-//
-//    val importPaths = imports.map(path.resolveSibling(_)).toSet // TODO: check for dupes ?
-//
-//    importPaths.foldLeft(current.add(path, value, importPaths)) {
-//      (a, b) =>
-//        if (!a.payload.contains(b))
-//          loadAll(a, b, verbose)
-//        else
-//          a
-//    }
-    null
+  def runDag(dag: Dag[Path, Seq[W]]) = {
+
+    val data: Seq[W] = dag.topologicalSort.reverse.map(x => dag.payload(x)).flatten
+
+    val (res, time) = timeFunc(data.foldLeft(new Dict(scala.collection.immutable.HashMap()): Any) {
+      case (env, form) =>
+        require(env.isInstanceOf[Dict], "Expected the result of the non-last statement to give us an environment, instead found: " + env)
+
+        Interpretter.eval(form, env.asInstanceOf[Dict].value)
+    })
+    
+    println("Took time: " + time + " result: " + res)
+
   }
 
-  def runDag(dag: Dag[Path, Any], verbose: Boolean): Any = {
-
-    val data = dag.topologicalSort.reverse.map(x => x -> dag.payload(x))
-
-    val r = data.foldLeft(Map(): Any) {
-      case (env, (path, form)) =>
-        require(env.isInstanceOf[WDict], "Expected the result of an import to give us an environment, instead found: " + env)
-
-        if (verbose)
-          println("About to interpret file: " + path)
-
-        val (result, t) = timeFunc(Interpretter.eval(/*form*/null, env.asInstanceOf[WDict].value))
-
-        if (verbose)
-          println("..took " + t)
-
-        result
-    }
-    if (verbose)
-      println("--------")
-    println(r)
-  }
-
-  def runWatch(dag: Dag[Path, Any], verbose: Boolean) {
+  def runWatch(dag: Dag[Path, Seq[W]], verbose: Boolean) {
     val entry = dag.root
 
     var d = dag
 
     while (true) {
       try {
-        runDag(d, verbose)
+        //   runDag(d, verbose)
       } catch {
         case x: Throwable => println("Caught exception: " + x)
       }
@@ -115,7 +87,7 @@ Valid options are:
         d = d.remove(p)
       }
 
-      d = loadAll(d, entry, verbose)
+      // d = loadAll(d, entry, verbose)
     }
   }
 

@@ -9,8 +9,8 @@ object Interpretter {
   def apply(form: W): W = eval(form, new HashMap())
 
   def eval(form: W, e: HashMap[W, W]): W = form match {
-    case sym: WSym => {
-      require(e.contains(sym), "Could not find: " + sym + " in enviornment")
+    case sym: Sym => {
+      require(e.contains(sym), "Could not find: " + sym + " in enviornment: " + e)
       e(sym)
     }
     case fnCall: WList =>
@@ -21,14 +21,22 @@ object Interpretter {
         // in order to tail call if/eval, can't just dynamic-dispatch out
 
         case WLambdaRun(capEnv, argS, capCode) =>
-          eval(capCode, capEnv + (argS -> new WParamList("{rawFunc: " + fn.summary + "}", e, rawArgs)))
+          eval(capCode, capEnv + (argS -> new ParamList(e, rawArgs)))
 
-        case _: WIf => {
+        case _: If => {
           val Stream(cond, trueCase, falseCase) = rawArgs
           if (eval(cond, e).hostBool)
             eval(trueCase, e)
           else
             eval(falseCase, e)
+        }
+
+        // this needs access to the env.. (TODO: make all functions take a ParamList, and move this there?)
+        case _: Lambda => {
+          val Stream(s, code) = rawArgs
+          val sym = eval(s,e)
+          require(sym.isInstanceOf[Sym], "Must bind argument list to a symbol")
+          new WLambdaRun(e, sym.asInstanceOf[Sym] , eval(code,e))
         }
 
         case wf => wf.execute(fnCall, rawArgs.map(eval(_, e)))
