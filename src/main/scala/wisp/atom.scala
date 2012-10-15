@@ -9,8 +9,8 @@ trait W {
   def name: String = this.getClass().toString()
 
   def getAst: Stream[W] = err
-  def getEnv: HashMap[W,W] = err
-  
+  def getEnv: HashMap[W, W] = err
+
   def hostBool: Boolean = err
   def hostChar: Char = err
   def hostDict: HashMap[W, W] = err
@@ -50,8 +50,10 @@ class WChar(val value: Char) extends W {
 }
 
 class Dict(val value: HashMap[W, W]) extends W {
-  override def summary = "{Dict of " + value.size + "}"
   override def name = "Dict"
+  override def summary = "{" +
+    value.toList.map(x => (x._1.verbose + " " + x._2.verbose)).mkString(", ") +
+    "}"
   override def hostDict = value
   override def equals(o: Any) = o match {
     case d: Dict => value == d.value
@@ -78,7 +80,7 @@ class WList(val value: Stream[W]) extends W {
 class ParamList(env: HashMap[W, W], unevaldArgs: Stream[W]) extends W {
   override def summary = "{ParamList: " + unevaldArgs.map(_.summary).mkString(" ") + "}"
   override def name = "ParamList"
-    
+
   override def getAst = unevaldArgs
   override def getEnv = env
 
@@ -96,11 +98,25 @@ class Vect(val value: IndexedSeq[W]) extends W {
     o match {
       case l: Vect => value == l.value
       case s: Seq[_] => value == s
-      case st: String => value == st.toSeq
+      case st: String => asString.map(_ == st).getOrElse(false)
       case _ => false
     }
 
+  private def asString: Option[String] = {
+    val builder = StringBuilder.newBuilder
+
+    value.foreach { x =>
+      if (x.isInstanceOf[WChar])
+        builder += x.asInstanceOf[WChar].value
+      else
+        return None
+    }
+
+    Some(builder.result)
+  }
+
   override def verbose = "[" + value.map(_.verbose).mkString(" ") + "]"
+  override def hashCode = asString.map(_.hashCode).getOrElse(value.hashCode)
 }
 
 class Num(val value: Int) extends W {
@@ -111,6 +127,7 @@ class Num(val value: Int) extends W {
     case i: Int => value == i
     case _ => false
   }
+  override def hashCode = value.hashCode()
 }
 
 class Sym(val value: Symbol) extends W {

@@ -2,6 +2,7 @@ package wisp
 
 import scala.util.parsing.combinator._
 import scala.util.parsing.input.CharSequenceReader
+import scala.collection.immutable.HashMap
 
 import java.nio.file._
 
@@ -51,7 +52,7 @@ object Reader extends Parsers {
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
 
   private def atomParser: Parser[W with Positional] =
-    positioned((numParser | charParser | listParser | literalStringParser | literalVectParser | builtInSymbolParser | symbolParser) ~ opt('.' ~> atomParser) ^^
+    positioned((numParser | charParser | listParser | literalStringParser | literalVectParser | builtInSymbolParser | symbolParser | literalDictParser) ~ opt('.' ~> atomParser) ^^
       (x => if (x._2.isDefined) new WList(Stream(x._1, x._2.get)) with Positional else x._1))
 
   private def charParser =
@@ -62,6 +63,18 @@ object Reader extends Parsers {
 
   private def literalVectParser = {
     positioned('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ (x => new Vect(x.toIndexedSeq) with Positional))
+  }
+
+  // {key value, key value, key value} 
+  private def literalDictParser = positioned('{' ~> opt(singleSpace) ~> repsep(dictPairParser, ',' ~ singleSpace) ~< opt(singleSpace) <~ '}' ^^
+     (x => new Dict(listToHashMap(x.map(y => y._1 -> y._2))) with Positional))
+     
+  private def dictPairParser = atomParser ~< singleSpace ~ atomParser
+  
+  private def listToHashMap[A,B](values: List[(A,B)]): HashMap[A,B] = values.foldLeft(HashMap[A,B]()) {
+    (state,next) =>
+      require(!state.contains(next._1), next + " already exists in literal dict")
+      state + next
   }
 
   // TODO: allow arbitrary base
@@ -83,7 +96,9 @@ object Reader extends Parsers {
       c == '(' || c == ')' ||
       c == '[' || c == ']' ||
       c == '~' || c == '"' ||
-      c == ';' || c == '.'
+      c == ';' || c == '.' ||
+      c == ',' || c == ':' ||
+      c == '{' || c == '}'
 
   private def literalStringParser = '"' ~> rep(positioned(insideLiteralParser)) ~< '"' ^^ (x => new Vect(x.toIndexedSeq) with Positional)
 

@@ -3,6 +3,7 @@ package wisp.unit_tests
 import org.specs2.mutable._
 import wisp._
 import scala.util.parsing.input.Positional
+import scala.collection.immutable.HashMap 
 
 class ReaderSpec extends Specification {
 
@@ -54,9 +55,15 @@ class ReaderSpec extends Specification {
 
       read("~a ~b ~3 ~d ~e ~f") must_== List('a', 'b', '3', 'd', 'e', 'f')
     }
-    "work with convenience quoted lists" in {
+    "work with vectors" in {
       read("[a b c]") must_== Seq('a, 'b, 'c)
       read("[a [b 4]]") must_== Seq('a, Seq('b, 4))
+    }
+    "read a dict" in {
+      read("{}") must_== HashMap()
+      read("{key value}") must_== HashMap('key -> 'value)
+      read("{key value, 3 ~c, \"cat\" 44}") must_== HashMap('key -> 'value, 3 -> 'c', "cat" -> 44)
+      //read("{key value, 3 ~c, \"cat\" 44}") must_== HashMap('key -> 'value, 3 -> 'c', "cat" -> 44)
     }
     "handle explicit function calls / lists" in {
       read("(f a b)") must_== List('f, 'a, 'b)
