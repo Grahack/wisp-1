@@ -3,7 +3,7 @@ package wisp.unit_tests
 import org.specs2.mutable._
 import wisp._
 import scala.util.parsing.input.Positional
-import scala.collection.immutable.HashMap 
+import scala.collection.immutable.HashMap
 
 class ReaderSpec extends Specification {
 
@@ -114,6 +114,12 @@ class ReaderSpec extends Specification {
       val pos = read("\n#ListHead\n\t#ListHead").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
       pos.line must_== 3
       pos.column must_== 2
+    }
+
+    "handle escaping" in {
+      read(":4") must_== Seq(new Escape {}, 4)
+      read(":dog") must_== Seq(new Escape {}, 'dog)
+      read(":(navy seal)") must_== Seq(new Escape {}, Seq('navy, 'seal))
     }
   }
 

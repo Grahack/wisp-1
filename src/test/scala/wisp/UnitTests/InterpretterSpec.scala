@@ -18,6 +18,9 @@ class InterpretterSpec extends Specification {
       interpret("\"roller\"") must_== "roller"
       interpret("[1 2 3 4 5]") must_== Seq(1, 2, 3, 4, 5)
       interpret("[1 2 [3 4 5]]") must_== Seq(1, 2, Seq(3, 4, 5))
+      interpret(":4") must_== 4
+      interpret(":cat") must_== 'cat
+      interpret(":(2 for the money)") must_== Seq(2, 'for, 'the, 'money)
     }
     
     "Basic function calls works" in {

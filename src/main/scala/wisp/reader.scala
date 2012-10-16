@@ -52,8 +52,10 @@ object Reader extends Parsers {
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
 
   private def atomParser: Parser[W with Positional] =
-    positioned((numParser | charParser | listParser | literalStringParser | literalVectParser | builtInSymbolParser | symbolParser | literalDictParser) ~ opt('.' ~> atomParser) ^^
+    positioned((escapeParser | numParser | charParser | listParser | literalStringParser | literalVectParser | builtInSymbolParser | symbolParser | literalDictParser) ~ opt('.' ~> atomParser) ^^
       (x => if (x._2.isDefined) new WList(Stream(x._1, x._2.get)) with Positional else x._1))
+
+  private def escapeParser = positioned(positioned(':' ^^ (_ => new Escape with Positional)) ~ atomParser ^^ (x => new WList(x._1 #:: x._2 #:: Stream[W]()) with Positional))
 
   private def charParser =
     positioned('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => new WChar(x) with Positional))
@@ -124,9 +126,9 @@ object Reader extends Parsers {
   private def builtInSymbolParser =
     bm("#True", new Bool(true) with Positional) |
       bm("#False", new Bool(false) with Positional) |
+      bm("#escape", new Escape with Positional) |
       bm("#eval", new Eval with Positional) |
       bm("#if", new If with Positional) |
-      bm("#quote", new Quote with Positional) |
       bm("#vau", new Vau with Positional) |
       bm("#type-eq", new TypeEq with Positional) |
       bm("#type-of", new TypeOf with Positional) |

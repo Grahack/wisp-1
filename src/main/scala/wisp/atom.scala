@@ -24,6 +24,7 @@ trait W {
   protected def err(op: String) = sys.error("Operation " + op + " not supported on: " + verbose)
 
   override def toString = summary
+  override def hashCode = name.hashCode()
 }
 
 class Bool(val value: Boolean) extends W {
@@ -191,12 +192,13 @@ trait Vau extends W {
 //          new VauRun(e, sym.asInstanceOf[Sym], eval(code, e))
 //        }
 
-trait Quote extends W {
-  override def name = "Quote"
+trait Escape extends W {
+  override def name = "Escape"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     require(fn.value.length == 2, "Argument to quote must have exactly 1 argument")
     fn.value(1)
   }
+  override def equals(o: Any) = o.isInstanceOf[Escape]
 }
 
 trait TypeEq extends W {
