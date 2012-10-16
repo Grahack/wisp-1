@@ -67,12 +67,12 @@ object Reader extends Parsers {
 
   // {key value, key value, key value} 
   private def literalDictParser = positioned('{' ~> opt(singleSpace) ~> repsep(dictPairParser, ',' ~ singleSpace) ~< opt(singleSpace) <~ '}' ^^
-     (x => new Dict(listToHashMap(x.map(y => y._1 -> y._2))) with Positional))
-     
+    (x => new Dict(listToHashMap(x.map(y => y._1 -> y._2))) with Positional))
+
   private def dictPairParser = atomParser ~< singleSpace ~ atomParser
-  
-  private def listToHashMap[A,B](values: List[(A,B)]): HashMap[A,B] = values.foldLeft(HashMap[A,B]()) {
-    (state,next) =>
+
+  private def listToHashMap[A, B](values: List[(A, B)]): HashMap[A, B] = values.foldLeft(HashMap[A, B]()) {
+    (state, next) =>
       require(!state.contains(next._1), next + " already exists in literal dict")
       state + next
   }
@@ -124,12 +124,10 @@ object Reader extends Parsers {
   private def builtInSymbolParser =
     bm("#True", new Bool(true) with Positional) |
       bm("#False", new Bool(false) with Positional) |
-      bm("#ast", new AstOf with Positional) |
-      bm("#env", new EnvOf with Positional) |
       bm("#eval", new Eval with Positional) |
-      bm("#lambda", new Lambda with Positional) |
       bm("#if", new If with Positional) |
       bm("#quote", new Quote with Positional) |
+      bm("#vau", new Vau with Positional) |
       bm("#type-eq", new TypeEq with Positional) |
       bm("#type-of", new TypeOf with Positional) |
       bm("#bool-not", new BoolNot with Positional) |

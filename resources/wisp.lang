@@ -32,12 +32,10 @@
       <prefix>#</prefix> 
       <keyword>True</keyword>
       <keyword>False</keyword>
-      <keyword>ast</keyword>
-      <kewyword>env</kworyd>
       <keyword>eval</keyword>
-      <keyword>lambda</keyword>
       <keyword>if</keyword>
       <keyword>quote</keyword>
+      <keyword>vau</keyword>
       <keyword>type-eq</keyword>
       <keyword>type-of</keyword>
       <keyword>bool-not</keyword>

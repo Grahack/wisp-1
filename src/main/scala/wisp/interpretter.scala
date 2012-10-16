@@ -20,8 +20,10 @@ object Interpretter {
       eval(fn, e) match {
         // in order to tail call if/eval, can't just dynamic-dispatch out
 
-        case WLambdaRun(capEnv, argS, capCode) =>
-          eval(capCode, capEnv + (argS -> new ParamList(e, rawArgs)))
+        case VauRun(capEnv, argS, envS, capCode) =>
+          eval(capCode, capEnv +
+              (argS -> new WList(rawArgs) with DerivedFrom { def from = fnCall })  + 
+              (envS -> new Dict(e) with DerivedFrom { def from = fnCall }))
 
         case _: If => {
           val Stream(cond, trueCase, falseCase) = rawArgs
@@ -31,15 +33,7 @@ object Interpretter {
             eval(falseCase, e)
         }
 
-        // this needs access to the env.. (TODO: make all functions take a ParamList, and move this there?)
-        case _: Lambda => {
-          val Stream(s, code) = rawArgs
-          val sym = eval(s,e)
-          require(sym.isInstanceOf[Sym], "Must bind argument list to a symbol")
-          new WLambdaRun(e, sym.asInstanceOf[Sym] , eval(code,e))
-        }
-
-        case wf => wf.execute(fnCall, rawArgs.map(eval(_, e)))
+        case wf => wf.execute(fnCall, e)
       }
     case x => x
   }
