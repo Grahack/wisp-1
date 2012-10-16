@@ -120,7 +120,7 @@ class Num(val value: Int) extends W {
 
 class Sym(val value: Symbol) extends W {
   override def name = value.name.toString()
-  override def verbose = "(#quote " + value.name + ")"
+  override def verbose = ":" + value.name
   override def hostSym = value
   override def equals(o: Any) =
     o match {

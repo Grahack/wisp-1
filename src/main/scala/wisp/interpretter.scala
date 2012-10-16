@@ -32,6 +32,11 @@ object Interpretter {
           else
             eval(falseCase, e)
         }
+        
+        case _: Eval => {
+          val Stream(dform, de) = rawArgs
+          eval(eval(dform,e), eval(de, e).asInstanceOf[Dict].value)
+        }
 
         case wf => wf.execute(fnCall, e)
       }
