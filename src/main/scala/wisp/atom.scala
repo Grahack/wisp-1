@@ -139,7 +139,7 @@ trait If extends W {
 // primitive
 
 trait Eval extends W {
-  override def summary = "Eval"
+  override def name = "Eval"
   // implementation in Interpretter, for tail-calls
 }
 
@@ -174,7 +174,7 @@ trait Vau extends W {
     val Stream(argSym, envSym, code) = fn.evaledArgs(env)
     require(argSym.isInstanceOf[Sym], "Vau expects that the arg is a symbol, got: " + argSym)
     require(argSym == Symbol("_") || !env.contains(argSym), "The environment already contains arg symbol: " + argSym)
-    
+
     require(envSym.isInstanceOf[Sym], "Vau expects that the env is a symbol, got: " + argSym)
     require(envSym == Symbol("_") || !env.contains(envSym), "The environment already contains env symbol: " + argSym)
 
@@ -184,21 +184,13 @@ trait Vau extends W {
   }
 }
 
-        // this needs access to the env.. (TODO: make all functions take a ParamList, and move this there?)
-//        case _: Vau => {
-//          val Stream(s, code) = rawArgs
-//          val sym = eval(s, e)
-//          require(sym.isInstanceOf[Sym], "Must bind argument list to a symbol")
-//          new VauRun(e, sym.asInstanceOf[Sym], eval(code, e))
-//        }
-
-trait Escape extends W {
-  override def name = "Escape"
+trait Quote extends W {
+  override def name = "Quote"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     require(fn.value.length == 2, "Argument to quote must have exactly 1 argument")
     fn.value(1)
   }
-  override def equals(o: Any) = o.isInstanceOf[Escape]
+  override def equals(o: Any) = o.isInstanceOf[Quote]
 }
 
 trait TypeEq extends W {
@@ -330,6 +322,7 @@ trait ListCons extends W {
 }
 
 trait ListHead extends W {
+  override def name = "ListHead"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(list) = fn.evaledArgs(env)
     list.hostList.head
@@ -349,6 +342,7 @@ trait ListMake extends W {
 }
 
 trait ListTail extends W {
+  override def name = "ListTail"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(list) = fn.evaledArgs(env)
     new WList(list.hostList.tail) with DerivedFrom { def from = fn }
@@ -443,7 +437,7 @@ trait DictToList extends W {
 
 trait Trace extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
-    println("Tracing: " + fn.evaledArgs(env).map(_.summary).mkString(" "))
+    println("Tracing: " + fn.evaledArgs(env).map(_.verbose).mkString(" "))
     new WList(Stream()) with DerivedFrom { def from = fn }
   }
 }

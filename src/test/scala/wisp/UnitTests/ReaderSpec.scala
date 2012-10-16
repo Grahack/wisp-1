@@ -116,11 +116,6 @@ class ReaderSpec extends Specification {
       pos.column must_== 2
     }
 
-    "handle escaping" in {
-      read(":4") must_== Seq(new Escape {}, 4)
-      read(":dog") must_== Seq(new Escape {}, 'dog)
-      read(":(navy seal)") must_== Seq(new Escape {}, Seq('navy, 'seal))
-    }
   }
 
   def read(s: String) = Reader(s)(0)

@@ -44,7 +44,7 @@
       <keyword>False</keyword>
       <keyword>eval</keyword>
       <keyword>if</keyword>
-      <keyword>escape</keyword>
+      <keyword>quote</keyword>
       <keyword>vau</keyword>
       <keyword>type-eq</keyword>
       <keyword>type-of</keyword>
