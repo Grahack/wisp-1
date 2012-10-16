@@ -7,9 +7,11 @@
   </metadata>
 
   <styles>
+    <style id="char" _name="Character" map-to="def:character"/>
     <style id="comment" _name="Comment" map-to="def:comment"/>
     <style id="string" _name="String" map-to="def:string"/>
     <style id="keyword" _name="Keyword" map-to="def:keyword"/>
+    <style id="decimal" _name="Decimal" map-to="def:decimal"/>
   </styles>
 
   <definitions>
@@ -26,6 +28,14 @@
       <include>
         <context ref="def:escape"/>
       </include>
+    </context>
+
+    <context id="char" style-ref="char">
+     <match>~.</match>
+   </context>
+
+    <context id="number" style-ref="decimal">
+      <match>\b(0|[\+-]?[1-9][0-9]*)</match>
     </context>
 
     <context id="keyword" style-ref="keyword">
@@ -77,7 +87,9 @@
       <include>
         <context ref="line-comment"/>
         <context ref="string"/>
+        <context ref="char"/>
         <context ref="keyword"/>
+        <context ref="number"/>
       </include>
     </context>
 
