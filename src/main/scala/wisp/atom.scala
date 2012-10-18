@@ -7,7 +7,7 @@ trait W {
   def verbose: String = summary
   def summary: String = name
   def name: String = this.getClass().toString()
-  
+
   def getEnv: HashMap[W, W] = err("getEnv")
 
   def hostBool: Boolean = err("hostBool")
@@ -71,8 +71,8 @@ class WList(val value: Stream[W]) extends W {
     case s: Seq[_] => value == s
     case _ => false
   }
-  
-  def evaledArgs(e: HashMap[W,W]) = value.tail.map(Interpretter.eval(e, _))
+
+  def evaledArgs(e: HashMap[W, W]) = value.tail.map(Interpretter.eval(e, _))
 
   override def verbose = "(" + value.map(_.verbose).mkString(" ") + ")"
   override def hashCode = value.hashCode()
@@ -118,6 +118,8 @@ class Num(val value: Int) extends W {
   override def hashCode = value.hashCode()
 }
 
+// It's probably more efficient to implement this as a trait, rather than
+// boxing a symbol. TODO: investiage
 class Sym(val value: Symbol) extends W {
   override def name = value.name.toString()
   override def verbose = ":" + value.name
@@ -131,16 +133,62 @@ class Sym(val value: Symbol) extends W {
   override def hashCode = value.hashCode()
 }
 
+// Pretty much what you'd expect: Takes three arguments: cond trueCase falseCase
+// only evalutes trueCase if it needs to, only evalutes falseCase if it needs to
 trait If extends W {
   override def name = "If"
   // implementation in Interpretter, for tail-calls
 }
 
-// primitive
+// Takes multiple arguments, returns the value the last one.
+trait Do extends W {
+  override def name = "Do"
+  // TODO: We'll have to implement this in Interpretter if we want to tail call the last arg :(
+  override def execute(fn: WList, env: HashMap[W, W]) = {
+    fn.evaledArgs(env).last // This is rather dodgy, as it relies on scala's streams stupidnesss to evaluate everything
+  }
+}
 
+// Takes two arguments, the form and the environment. Then evaluates the form using
+// the environment. Remember this function is strict, so the arguments are "double"
+// evaluated
 trait Eval extends W {
   override def name = "Eval"
   // implementation in Interpretter, for tail-calls
+}
+
+trait Weave extends W {
+  override def name = "Weave"
+  override def execute(fn: WList, env: HashMap[W, W]) = {
+    val args = fn.evaledArgs(env)
+    require(args.nonEmpty, "Weave needs at least one argument") // and probably at least two is recommend?
+
+    args.tail.foreach { form =>
+      require(form.isInstanceOf[WList], "Expected: " + form + " to be a WList")
+      require(form.asInstanceOf[WList].value.nonEmpty, "Expected: " + form + " to be non-empty")
+    }
+
+    args.tail.map(_.asInstanceOf[WList]).foldLeft(args.head) { (a, b) =>
+      new WList(b.value.head #:: a #:: b.value.tail) with DerivedFrom { def from = fn }
+    }
+  }
+}
+
+trait Vau extends W {
+  override def name = "Vau"
+  override def execute(fn: WList, env: HashMap[W, W]) = {
+    val Stream(argSym, envSym, code) = fn.evaledArgs(env)
+    // not entirely sure special casing _ is overly nice, but it seems to work well in practice
+    require(argSym.isInstanceOf[Sym], "Vau expects that the arg is a symbol, got: " + argSym)
+    require(argSym == Symbol("_") || !env.contains(argSym), "The environment already contains arg symbol: " + argSym)
+
+    require(envSym.isInstanceOf[Sym], "Vau expects that the env is a symbol, got: " + argSym)
+    require(envSym == Symbol("_") || !env.contains(envSym), "The environment already contains env symbol: " + argSym)
+
+    require(envSym == Symbol("_") || argSym != envSym, "ArgSymbol and EnvSymbol: " + argSym + " must not be the same")
+
+    new VauRun(env, argSym.asInstanceOf[Sym], envSym.asInstanceOf[Sym], code)
+  }
 }
 
 case class VauRun(capEnv: HashMap[W, W], arg: Sym, env: Sym, capCode: W) extends W {
@@ -168,22 +216,7 @@ trait DerivedFrom {
   def from: W
 }
 
-trait Vau extends W {
-  override def name = "Vau"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(argSym, envSym, code) = fn.evaledArgs(env)
-    require(argSym.isInstanceOf[Sym], "Vau expects that the arg is a symbol, got: " + argSym)
-    require(argSym == Symbol("_") || !env.contains(argSym), "The environment already contains arg symbol: " + argSym)
-
-    require(envSym.isInstanceOf[Sym], "Vau expects that the env is a symbol, got: " + argSym)
-    require(envSym == Symbol("_") || !env.contains(envSym), "The environment already contains env symbol: " + argSym)
-
-    require(envSym == Symbol("_") || argSym != envSym, "ArgSymbol and EnvSymbol: " + argSym + " must not be the same")
-    
-    new VauRun(env, argSym.asInstanceOf[Sym], envSym.asInstanceOf[Sym], code)
-  }
-}
-
+// The only non-strict builtin in wisp. Return the first argument unevaluated
 trait Quote extends W {
   override def name = "Quote"
   override def execute(fn: WList, env: HashMap[W, W]) = {
@@ -194,6 +227,7 @@ trait Quote extends W {
 }
 
 trait TypeEq extends W {
+  override def name = "TypeEq"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Bool(a.hostType == b.hostType) with DerivedFrom { def from = fn }
@@ -201,6 +235,7 @@ trait TypeEq extends W {
 }
 
 trait TypeOf extends W {
+  override def name = "TypeOf"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a) = fn.evaledArgs(env)
     new WType(a.hostType) with DerivedFrom { def from = fn } // TODO: this is totally wrong
@@ -208,8 +243,8 @@ trait TypeOf extends W {
 }
 
 // boolean
-
 trait BoolNot extends W {
+  override def name = "BoolNot"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a) = fn.evaledArgs(env)
     new Bool(!a.hostBool) with DerivedFrom { def from = fn }
@@ -217,6 +252,7 @@ trait BoolNot extends W {
 }
 
 trait BoolEq extends W {
+  override def name = "BoolEq"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Bool(a.hostBool == b.hostBool) with DerivedFrom { def from = fn }
@@ -224,16 +260,16 @@ trait BoolEq extends W {
 }
 
 // num
-
 trait NumAdd extends W {
+  override def name = "NumAdd"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Num(a.hostNum + b.hostNum) with DerivedFrom { def from = fn }
   }
-  override def name = "NumAdd"
 }
 
 trait NumDiv extends W {
+  override def name = "NumDiv"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Num(a.hostNum / b.hostNum) with DerivedFrom { def from = fn }
@@ -241,6 +277,7 @@ trait NumDiv extends W {
 }
 
 trait NumGT extends W {
+  override def name = "NumGT"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Bool(a.hostNum > b.hostNum) with DerivedFrom { def from = fn }
@@ -330,6 +367,7 @@ trait ListHead extends W {
 }
 
 trait ListIsEmpty extends W {
+  override def name = "ListIsEmpty"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(list) = fn.evaledArgs(env)
     new Bool(list.hostList.isEmpty) with DerivedFrom { def from = fn }

@@ -123,10 +123,12 @@ object Reader extends Parsers {
   private def builtInSymbolParser =
     bm("#True", new Bool(true) with Positional) |
       bm("#False", new Bool(false) with Positional) |
+      bm("#do", new Do with Positional) |
       bm("#eval", new Eval with Positional) |
       bm("#if", new If with Positional) |
       bm("#quote", new Quote with Positional) |
       bm("#vau", new Vau with Positional) |
+      bm("#weave", new Weave with Positional) |
       bm("#type-eq", new TypeEq with Positional) |
       bm("#type-of", new TypeOf with Positional) |
       bm("#bool-not", new BoolNot with Positional) |

@@ -42,10 +42,12 @@
       <prefix>#</prefix> 
       <keyword>True</keyword>
       <keyword>False</keyword>
+      <keyword>do</keyword>
       <keyword>eval</keyword>
       <keyword>if</keyword>
       <keyword>quote</keyword>
       <keyword>vau</keyword>
+      <keyword>weave</keyword>
       <keyword>type-eq</keyword>
       <keyword>type-of</keyword>
       <keyword>bool-not</keyword>
