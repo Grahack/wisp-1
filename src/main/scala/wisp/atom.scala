@@ -72,7 +72,7 @@ class WList(val value: Stream[W]) extends W {
     case _ => false
   }
   
-  def evaledArgs(e: HashMap[W,W]) = value.tail.map(Interpretter.eval(_, e))
+  def evaledArgs(e: HashMap[W,W]) = value.tail.map(Interpretter.eval(e, _))
 
   override def verbose = "(" + value.map(_.verbose).mkString(" ") + ")"
   override def hashCode = value.hashCode()

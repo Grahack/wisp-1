@@ -55,7 +55,7 @@ Valid options are:
       case (env, form) =>
         require(env.isInstanceOf[Dict], "Expected the result of the non-last statement to give us an environment, instead found: " + env)
 
-        Interpretter.eval(form, env.asInstanceOf[Dict].value)
+        Interpretter.eval(env.asInstanceOf[Dict].value, form)
     })
     
     println("Took time: " + time + " result: " + res)
