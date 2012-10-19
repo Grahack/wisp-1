@@ -5,9 +5,9 @@ import wisp._
 import scala.util.parsing.input.Positional
 import scala.collection.immutable.HashMap
 
-class ReaderSpec extends Specification {
+class ParserSpec extends Specification {
 
-  "The Reader" should {
+  "The Parser" should {
 
     "actually able to load a real file" in {
       /* Writes the string to disk, then uses the reader to load it */
@@ -15,12 +15,12 @@ class ReaderSpec extends Specification {
       import java.nio.file.Files
       import java.io.FileOutputStream
       import java.nio.charset.Charset
-      val path = Files.createTempFile("wisp_reader_test", ".wisp")
+      val path = Files.createTempFile("wisp_parser_test", ".wisp")
       val stream = Files.newBufferedWriter(path, Charset.forName("UTF-8"))
       stream.write("434")
       stream.close()
 
-      Reader(path)(0) must_== 434
+      Parser(path)(0) must_== 434
     }
 
     "be able to read a numbers" in {
@@ -111,13 +111,13 @@ class ReaderSpec extends Specification {
       read("#num-add") must beAnInstanceOf[NumAdd]
       read("#list-make") must beAnInstanceOf[ListMake]
 
-      val pos = read("\n#ListHead\n\t#ListHead").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
+      val pos = read("\nListHead\n\tListHead").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
       pos.line must_== 3
       pos.column must_== 2
     }
 
   }
 
-  def read(s: String) = Reader(s)(0)
+  def read(s: String) = Parser(s)(0)
 
 }

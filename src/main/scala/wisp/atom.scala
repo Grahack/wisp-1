@@ -18,6 +18,7 @@ trait W {
   def hostSym: Symbol = err("hostSym")
   def hostType: WTypes.WType = err("hostType")
   def hostVect: IndexedSeq[W] = err("hostVect")
+  def hostString: String = err("hostString")
 
   def execute(fn: WList, env: HashMap[W, W]): W = err("execute")
 
@@ -89,6 +90,8 @@ class Vect(val value: IndexedSeq[W]) extends W {
       case st: String => asString.map(_ == st).getOrElse(false)
       case _ => false
     }
+
+  override def hostString = asString.get
 
   private def asString: Option[String] = {
     val builder = StringBuilder.newBuilder
@@ -171,6 +174,17 @@ trait Weave extends W {
     args.tail.map(_.asInstanceOf[WList]).foldLeft(args.head) { (a, b) =>
       new WList(b.value.head #:: a #:: b.value.tail) with DerivedFrom { def from = fn }
     }
+  }
+}
+
+trait ReadFile extends W {
+  override def name = "ReadFile"
+  override def execute(fn: WList, env: HashMap[W, W]) = {
+    val Stream(file) = fn.evaledArgs(env)
+
+    new WList(
+      scala.io.Source.fromFile(file.hostString).toStream
+        .map(new WChar(_) with DerivedFrom { def from = fn })) with DerivedFrom { def from = fn }
   }
 }
 
