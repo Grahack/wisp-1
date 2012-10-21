@@ -46,6 +46,8 @@
       <keyword>eval</keyword>
       <keyword>if</keyword>
       <keyword>quote</keyword>
+      <keyword>parse</keyword>
+      <keyword>read-file</keyword>
       <keyword>vau</keyword>
       <keyword>weave</keyword>
       <keyword>type-eq</keyword>

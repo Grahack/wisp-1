@@ -4,17 +4,13 @@ import scala.collection.immutable.HashMap
 import scala.util.parsing.input.Positional
 
 trait W {
-  def verbose: String = summary
-  def summary: String = name
-  def name: String = this.getClass().toString()
-
   def getEnv: HashMap[W, W] = err("getEnv")
 
-  def hostBool: Boolean = err("hostBool")
+  def hostBoolean: Boolean = err("hostBool")
   def hostChar: Char = err("hostChar")
-  def hostDict: HashMap[W, W] = err("hostDict")
-  def hostList: Stream[W] = err("hostList")
-  def hostNum: Int = err("hostNum")
+  def hostHashMap: HashMap[W, W] = err("hostDict")
+  def hostStream: Stream[W] = err("hostList")
+  def hostInt: Int = err("hostNum")
   def hostSym: Symbol = err("hostSym")
   def hostType: WTypes.WType = err("hostType")
   def hostVect: IndexedSeq[W] = err("hostVect")
@@ -22,15 +18,12 @@ trait W {
 
   def execute(fn: WList, env: HashMap[W, W]): W = err("execute")
 
-  protected def err(op: String) = sys.error("Operation " + op + " not supported on: " + verbose)
-
-  override def toString = summary
-  override def hashCode = name.hashCode()
+  protected def err(op: String) = sys.error("Operation " + op + " not supported on: " + this)
 }
 
 class Bool(val value: Boolean) extends W {
-  override def name = if (value) "True" else "False"
-  override def hostBool = value
+  override def toString = if (value) "True" else "False"
+  override def hostBoolean = value
   override def equals(o: Any) = o match {
     case wb: Bool => value == wb.value
     case b: Boolean => value == b
@@ -40,7 +33,7 @@ class Bool(val value: Boolean) extends W {
 }
 
 class WChar(val value: Char) extends W {
-  override def name = "~" + value
+  override def toString = "~" + value
   override def hostChar = value
   override def equals(o: Any) = o match {
     case wc: WChar => value == wc.value
@@ -51,10 +44,9 @@ class WChar(val value: Char) extends W {
 }
 
 class Dict(val value: HashMap[W, W]) extends W {
-  override def name = "Dict"
-  override def summary =
-    "{" + value.toList.map(x => (x._1.verbose + " " + x._2.verbose)).mkString(", ") + "}"
-  override def hostDict = value
+  override def toString =
+    "{" + value.toList.map(x => (x._1.toString + " " + x._2.toString)).mkString(", ") + "}"
+  override def hostHashMap = value
   override def equals(o: Any) = o match {
     case d: Dict => value == d.value
     case i: HashMap[_, _] => value == i
@@ -64,9 +56,7 @@ class Dict(val value: HashMap[W, W]) extends W {
 }
 
 class WList(val value: Stream[W]) extends W {
-  override def name = "List"
-  override def toString = "(List: " + value.toString + ")"
-  override def hostList = value
+  override def hostStream = value
   override def equals(o: Any) = o match {
     case l: WList => value == l.value
     case s: Seq[_] => value == s
@@ -75,13 +65,16 @@ class WList(val value: Stream[W]) extends W {
 
   def evaledArgs(e: HashMap[W, W]) = value.tail.map(Interpretter.eval(e, _))
 
-  override def verbose = "(" + value.map(_.verbose).mkString(" ") + ")"
+  override def toString =
+    if (value.forall(_.isInstanceOf[WChar])) {
+      "(list " + value.map(_.asInstanceOf[WChar].value).mkString + ")"
+    } else
+      "(" + value.map(_.toString).mkString(" ") + ")"
   override def hashCode = value.hashCode()
 }
 
 class Vect(val value: IndexedSeq[W]) extends W {
-  override def name = "Vect of " + value.length
-  override def summary = if (value.forall { _.isInstanceOf[WChar] }) '"' + value.map(_.asInstanceOf[WChar].value).mkString + '"' else name
+  override def toString = asString.map('"' + _ + '"').getOrElse(value.mkString(" "))
   override def hostVect = value
   override def equals(o: Any) =
     o match {
@@ -106,13 +99,12 @@ class Vect(val value: IndexedSeq[W]) extends W {
     Some(builder.result)
   }
 
-  override def verbose = "[" + value.map(_.verbose).mkString(" ") + "]"
   override def hashCode = asString.map(_.hashCode).getOrElse(value.hashCode)
 }
 
 class Num(val value: Int) extends W {
-  override def name = value.toString()
-  override def hostNum = value
+  override def toString = value.toString()
+  override def hostInt = value
   override def equals(o: Any) = o match {
     case n: Num => value == n.value
     case i: Int => value == i
@@ -124,8 +116,7 @@ class Num(val value: Int) extends W {
 // It's probably more efficient to implement this as a trait, rather than
 // boxing a symbol. TODO: investiage
 class Sym(val value: Symbol) extends W {
-  override def name = value.name.toString()
-  override def verbose = ":" + value.name
+  override def toString = value.name
   override def hostSym = value
   override def equals(o: Any) =
     o match {
@@ -139,13 +130,13 @@ class Sym(val value: Symbol) extends W {
 // Pretty much what you'd expect: Takes three arguments: cond trueCase falseCase
 // only evalutes trueCase if it needs to, only evalutes falseCase if it needs to
 trait If extends W {
-  override def name = "If"
+  override def toString = "If"
   // implementation in Interpretter, for tail-calls
 }
 
 // Takes multiple arguments, returns the value the last one.
 trait Do extends W {
-  override def name = "Do"
+  override def toString = "Do"
   // TODO: We'll have to implement this in Interpretter if we want to tail call the last arg :(
   override def execute(fn: WList, env: HashMap[W, W]) = {
     fn.evaledArgs(env).last // This is rather dodgy, as it relies on scala's streams stupidnesss to evaluate everything
@@ -156,12 +147,12 @@ trait Do extends W {
 // the environment. Remember this function is strict, so the arguments are "double"
 // evaluated
 trait Eval extends W {
-  override def name = "Eval"
+  override def toString = "Eval"
   // implementation in Interpretter, for tail-calls
 }
 
 trait Weave extends W {
-  override def name = "Weave"
+  override def toString = "Weave"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val args = fn.evaledArgs(env)
     require(args.nonEmpty, "Weave needs at least one argument") // and probably at least two is recommend?
@@ -178,7 +169,7 @@ trait Weave extends W {
 }
 
 trait ReadFile extends W {
-  override def name = "ReadFile"
+  override def toString = "ReadFile"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(file) = fn.evaledArgs(env)
 
@@ -188,25 +179,40 @@ trait ReadFile extends W {
   }
 }
 
-trait Vau extends W {
-  override def name = "Vau"
+trait Parse extends W {
+  override def toString = "Parse"
   override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(argSym, envSym, code) = fn.evaledArgs(env)
+    val Stream(cl) = fn.evaledArgs(env)
+    val charList = cl.asInstanceOf[WList]
+    Parser(charList.hostString)
+  }
+}
+
+trait Vau extends W {
+  override def toString = "Vau"
+  override def execute(fn: WList, env: HashMap[W, W]) = {
+    val Stream(aS, eS, code) = fn.evaledArgs(env)
     // not entirely sure special casing _ is overly nice, but it seems to work well in practice
-    require(argSym.isInstanceOf[Sym], "Vau expects that the arg is a symbol, got: " + argSym)
-    require(argSym == Symbol("_") || !env.contains(argSym), "The environment already contains arg symbol: " + argSym)
+    require(aS.isInstanceOf[Sym], "Vau expects that the arg is a symbol, got: " + aS)
 
-    require(envSym.isInstanceOf[Sym], "Vau expects that the env is a symbol, got: " + argSym)
-    require(envSym == Symbol("_") || !env.contains(envSym), "The environment already contains env symbol: " + argSym)
+    val argSym = aS.asInstanceOf[Sym]
 
-    require(envSym == Symbol("_") || argSym != envSym, "ArgSymbol and EnvSymbol: " + argSym + " must not be the same")
+    require(argSym.value == Symbol("_") || !env.contains(argSym), "The environment already contains arg symbol: " + argSym)
 
-    new VauRun(env, argSym.asInstanceOf[Sym], envSym.asInstanceOf[Sym], code)
+    require(eS.isInstanceOf[Sym], "Vau expects that the env is a symbol, got: " + eS)
+
+    val envSym = eS.asInstanceOf[Sym]
+
+    require(envSym.value == Symbol("_") || !env.contains(envSym), "The environment already contains env symbol: " + envSym)
+
+    require(envSym.value == Symbol("_") || argSym != envSym, "ArgSymbol and EnvSymbol: " + argSym + " must not be the same")
+
+    new VauRun(env, argSym, envSym, code)
   }
 }
 
 case class VauRun(capEnv: HashMap[W, W], arg: Sym, env: Sym, capCode: W) extends W {
-  override def name = "$UDF$"
+  override def toString = "$UDF$"
   // implementation in Interpretter, for tail-calls
 }
 
@@ -216,7 +222,7 @@ object WTypes extends Enumeration {
 }
 
 class WType(val value: WTypes.WType) extends W {
-  override def name = "{Type: " + value.toString + "}"
+  override def toString = "{Type: " + value.toString + "}"
   override def hostType = value
   override def equals(o: Any) =
     o match {
@@ -232,7 +238,7 @@ trait DerivedFrom {
 
 // The only non-strict builtin in wisp. Return the first argument unevaluated
 trait Quote extends W {
-  override def name = "Quote"
+  override def toString = "Quote"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     require(fn.value.length == 2, "Argument to quote must have exactly 1 argument")
     fn.value(1)
@@ -241,7 +247,7 @@ trait Quote extends W {
 }
 
 trait TypeEq extends W {
-  override def name = "TypeEq"
+  override def toString = "TypeEq"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Bool(a.hostType == b.hostType) with DerivedFrom { def from = fn }
@@ -249,7 +255,7 @@ trait TypeEq extends W {
 }
 
 trait TypeOf extends W {
-  override def name = "TypeOf"
+  override def toString = "TypeOf"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a) = fn.evaledArgs(env)
     new WType(a.hostType) with DerivedFrom { def from = fn } // TODO: this is totally wrong
@@ -258,92 +264,92 @@ trait TypeOf extends W {
 
 // boolean
 trait BoolNot extends W {
-  override def name = "BoolNot"
+  override def toString = "BoolNot"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a) = fn.evaledArgs(env)
-    new Bool(!a.hostBool) with DerivedFrom { def from = fn }
+    new Bool(!a.hostBoolean) with DerivedFrom { def from = fn }
   }
 }
 
 trait BoolEq extends W {
-  override def name = "BoolEq"
+  override def toString = "BoolEq"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostBool == b.hostBool) with DerivedFrom { def from = fn }
+    new Bool(a.hostBoolean == b.hostBoolean) with DerivedFrom { def from = fn }
   }
 }
 
 // num
 trait NumAdd extends W {
-  override def name = "NumAdd"
+  override def toString = "NumAdd"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
-    new Num(a.hostNum + b.hostNum) with DerivedFrom { def from = fn }
+    new Num(a.hostInt + b.hostInt) with DerivedFrom { def from = fn }
   }
 }
 
 trait NumDiv extends W {
-  override def name = "NumDiv"
+  override def toString = "NumDiv"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
-    new Num(a.hostNum / b.hostNum) with DerivedFrom { def from = fn }
+    new Num(a.hostInt / b.hostInt) with DerivedFrom { def from = fn }
   }
 }
 
 trait NumGT extends W {
-  override def name = "NumGT"
+  override def toString = "NumGT"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostNum > b.hostNum) with DerivedFrom { def from = fn }
+    new Bool(a.hostInt > b.hostInt) with DerivedFrom { def from = fn }
   }
 }
 
 trait NumGTE extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostNum >= b.hostNum) with DerivedFrom { def from = fn }
+    new Bool(a.hostInt >= b.hostInt) with DerivedFrom { def from = fn }
   }
 }
 
 trait NumEq extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostNum == b.hostNum) with DerivedFrom { def from = fn }
+    new Bool(a.hostInt == b.hostInt) with DerivedFrom { def from = fn }
   }
 }
 
 trait NumLT extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostNum < b.hostNum) with DerivedFrom { def from = fn }
+    new Bool(a.hostInt < b.hostInt) with DerivedFrom { def from = fn }
   }
 }
 
 trait NumLTE extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostNum <= b.hostNum) with DerivedFrom { def from = fn }
+    new Bool(a.hostInt <= b.hostInt) with DerivedFrom { def from = fn }
   }
 }
 
 trait NumMult extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
-    new Num(a.hostNum * b.hostNum) with DerivedFrom { def from = fn }
+    new Num(a.hostInt * b.hostInt) with DerivedFrom { def from = fn }
   }
 }
 
 trait NumSub extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
-    new Num(a.hostNum - b.hostNum) with DerivedFrom { def from = fn }
+    new Num(a.hostInt - b.hostInt) with DerivedFrom { def from = fn }
   }
 }
 
 trait NumToCharList extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a) = fn.evaledArgs(env)
-    new WList(a.hostNum.toString.map(x => new WChar(x)).toStream) with DerivedFrom { def from = fn }
+    new WList(a.hostInt.toString.map(x => new WChar(x)).toStream) with DerivedFrom { def from = fn }
   }
 }
 
@@ -368,23 +374,23 @@ trait SymToCharList extends W {
 trait ListCons extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(list, value) = fn.evaledArgs(env)
-    new WList(value #:: list.hostList) with DerivedFrom { def from = fn }
+    new WList(value #:: list.hostStream) with DerivedFrom { def from = fn }
   }
 }
 
 trait ListHead extends W {
-  override def name = "ListHead"
+  override def toString = "ListHead"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(list) = fn.evaledArgs(env)
-    list.hostList.head
+    list.hostStream.head
   }
 }
 
 trait ListIsEmpty extends W {
-  override def name = "ListIsEmpty"
+  override def toString = "ListIsEmpty"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(list) = fn.evaledArgs(env)
-    new Bool(list.hostList.isEmpty) with DerivedFrom { def from = fn }
+    new Bool(list.hostStream.isEmpty) with DerivedFrom { def from = fn }
   }
 }
 
@@ -394,10 +400,10 @@ trait ListMake extends W {
 }
 
 trait ListTail extends W {
-  override def name = "ListTail"
+  override def toString = "ListTail"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(list) = fn.evaledArgs(env)
-    new WList(list.hostList.tail) with DerivedFrom { def from = fn }
+    new WList(list.hostStream.tail) with DerivedFrom { def from = fn }
   }
 }
 
@@ -423,7 +429,7 @@ trait VectMake extends W {
 trait VectNth extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(vect, index) = fn.evaledArgs(env)
-    vect.hostVect(index.hostNum)
+    vect.hostVect(index.hostInt)
   }
 }
 
@@ -444,21 +450,21 @@ trait VectToList extends W {
 trait DictContains extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(dict, key) = fn.evaledArgs(env)
-    new Bool(dict.hostDict.contains(key)) with DerivedFrom { def from = fn }
+    new Bool(dict.hostHashMap.contains(key)) with DerivedFrom { def from = fn }
   }
 }
 
 trait DictGet extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(dict, key) = fn.evaledArgs(env)
-    dict.hostDict(key)
+    dict.hostHashMap(key)
   }
 }
 
 trait DictInsert extends W {
   override def execute(fn: WList, env: HashMap[W, W]): W = {
     val Stream(dict: W, key: W, value: W) = fn.evaledArgs(env)
-    val d = dict.hostDict
+    val d = dict.hostHashMap
     require(!d.contains(key))
     new Dict(d + (key -> value)) with DerivedFrom { def from = fn }
   }
@@ -467,7 +473,7 @@ trait DictInsert extends W {
 trait DictRemove extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(dict, key) = fn.evaledArgs(env)
-    val d = dict.hostDict
+    val d = dict.hostHashMap
     require(d.contains(key))
     new Dict(d - key) with DerivedFrom { def from = fn }
   }
@@ -476,25 +482,25 @@ trait DictRemove extends W {
 trait DictSize extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(dict) = fn.evaledArgs(env)
-    new Num(dict.hostDict.size) with DerivedFrom { def from = fn }
+    new Num(dict.hostHashMap.size) with DerivedFrom { def from = fn }
   }
 }
 
 trait DictToList extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(dict) = fn.evaledArgs(env)
-    new WList(dict.hostDict.toStream.map(x => new WList(Stream(x._1, x._2)))) with DerivedFrom { def from = fn }
+    new WList(dict.hostHashMap.toStream.map(x => new WList(Stream(x._1, x._2)))) with DerivedFrom { def from = fn }
   }
 }
 
 trait Trace extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
-    println("Tracing: " + fn.evaledArgs(env).map(_.verbose).mkString(" "))
+    println("Tracing: " + fn.evaledArgs(env).map(_.toString).mkString(" "))
     new WList(Stream()) with DerivedFrom { def from = fn }
   }
 }
 
 trait WError extends W {
   override def execute(fn: WList, env: HashMap[W, W]) =
-    sys.error("Code Error." + fn.evaledArgs(env).map(_.summary).mkString(", ")) // TODO: better info
+    sys.error("Code Error." + fn.evaledArgs(env).map(_.toString).mkString(", ")) // TODO: better info
 }

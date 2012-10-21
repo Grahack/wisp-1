@@ -27,7 +27,7 @@ object Interpretter {
 
         case _: If => {
           val Stream(cond, trueCase, falseCase) = rawArgs
-          if (eval(e, cond).hostBool)
+          if (eval(e, cond).hostBoolean)
             eval(e, trueCase)
           else
             eval(e, falseCase)

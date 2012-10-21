@@ -12,13 +12,14 @@ object Parser extends Parsers {
 
   type Elem = Char
 
-  def apply(path: Path): Seq[W] = apply(new String(Files.readAllBytes(path)))
+  def apply(path: scala.io.Source): WList with Positional =
+    run(new scala.util.parsing.input.PagedSeqReader(
+      scala.collection.immutable.PagedSeq.fromSource(path)))
 
-  def apply(contents: String): Seq[W with Positional] = {
+  def apply(contents: CharSequence): WList with Positional = run(new scala.util.parsing.input.CharSequenceReader(contents))
 
-    val csr = new scala.util.parsing.input.CharArrayReader(contents.toCharArray())
-
-    fileParser(csr) match {
+  def run(rdr: scala.util.parsing.input.Reader[Char]) = {
+    fileParser(rdr) match {
       case Success(res, next) => {
         if (next.atEnd)
           res
@@ -30,8 +31,9 @@ object Parser extends Parsers {
     }
   }
 
-  private def fileParser: Parser[Seq[W with Positional]] =
-    rep(lineParser(0)) ~< rep(eol)
+  private def fileParser: Parser[WList with Positional] = {
+    positioned(rep(eol) ~> repsep(lineParser(0), rep1(eol)) ~< rep(eol) ^^ (x => new WList(x.toStream) with Positional))
+  }
 
   private def lineParser(depth: Int): Parser[W with Positional] =
     rep(blankLine) ~>
@@ -52,7 +54,7 @@ object Parser extends Parsers {
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
 
   private def atomParser: Parser[W with Positional] =
-    positioned((numParser | charParser | listParser | literalStringParser | literalVectParser | preprocessParser | symbolParser | literalDictParser) ~ opt('.' ~> atomParser) ^^
+    positioned((numParser | charParser | listParser | literalStringParser | literalVectParser | symbolParser | literalDictParser | builtInSymbolParser) ~ opt('.' ~> atomParser) ^^
       (x => if (x._2.isDefined) new WList(Stream(x._1, x._2.get)) with Positional else x._1))
 
   private def charParser =
@@ -102,8 +104,6 @@ object Parser extends Parsers {
 
   private def literalStringParser = '"' ~> rep(positioned(insideLiteralParser ^^ (new WChar(_) with Positional))) ~< '"' ^^ (x => new Vect(x.toIndexedSeq) with Positional)
 
-  private def preprocessParser = '#' ~> builtInSymbolParser
-  
   // TODO: allow string escaping
   private def insideLiteralParser = acceptIf(x => x != '"' && x != '\n')("Unexpected '" + _ + "' when parsing inside a literal string")
 
@@ -117,55 +117,57 @@ object Parser extends Parsers {
   private def singleSpace = elem(' ')
 
   // get around annoying precedent rule of <~
+  import language.implicitConversions
   implicit private def toUnannoying[T](p: Parser[T]): UnannoyingParser[T] = new UnannoyingParser(p)
   private class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
 
   private def bm(s: String, exp: => W with Positional): Parser[W with Positional] =
     acceptSeq(s) ^^ (_ => exp)
 
-  private def builtInSymbolParser =
+  private def builtInSymbolParser = '#' ~> (
     bm("True", new Bool(true) with Positional) |
-      bm("False", new Bool(false) with Positional) |
-      bm("do", new Do with Positional) |
-      bm("eval", new Eval with Positional) |
-      bm("if", new If with Positional) |
-      bm("quote", new Quote with Positional) |
-      bm("vau", new Vau with Positional) |
-      bm("weave", new Weave with Positional) |
-      bm("read-file", new ReadFile with Positional ) |
-      bm("type-eq", new TypeEq with Positional) |
-      bm("type-of", new TypeOf with Positional) |
-      bm("bool-not", new BoolNot with Positional) |
-      bm("bool-eq", new BoolEq with Positional) |
-      bm("num-add", new NumAdd with Positional) |
-      bm("num-div", new NumDiv with Positional) |
-      bm("num-gt", new NumGT with Positional) |
-      bm("num-gte", new NumGTE with Positional) |
-      bm("num-eq", new NumEq with Positional) |
-      bm("num-lt", new NumLT with Positional) |
-      bm("num-lte", new NumLTE with Positional) |
-      bm("num-mult", new NumMult with Positional) |
-      bm("num-sub", new NumSub with Positional) |
-      bm("num-to-char-list", new NumToCharList with Positional) |
-      bm("sym-eq", new SymEq with Positional) |
-      bm("sym-to-char-list", new SymToCharList with Positional) |
-      bm("list-cons", new ListCons with Positional) |
-      bm("list-head", new ListHead with Positional) |
-      bm("list-empty?", new ListIsEmpty with Positional) |
-      bm("list-make", new ListMake with Positional) |
-      bm("list-tail", new ListTail with Positional) |
-      bm("vect-append", new VectToList with Positional) |
-      bm("vect-length", new VectLength with Positional) |
-      bm("vect-make", new VectMake with Positional) |
-      bm("vect-nth", new VectNth with Positional) |
-      bm("vect-prepend", new VectToList with Positional) |
-      bm("vect-to-list", new VectToList with Positional) |
-      bm("dict-contains", new DictContains with Positional) |
-      bm("dict-get", new DictGet with Positional) |
-      bm("dict-insert", new DictInsert with Positional) |
-      bm("dict-remove", new DictRemove with Positional) |
-      bm("dict-size", new DictSize with Positional) |
-      bm("dict-to-list", new DictToList with Positional) |
-      bm("trace", new Trace with Positional) |
-      bm("error", new WError with Positional)
+    bm("False", new Bool(false) with Positional) |
+    bm("do", new Do with Positional) |
+    bm("eval", new Eval with Positional) |
+    bm("if", new If with Positional) |
+    bm("quote", new Quote with Positional) |
+    bm("parse", new Parse with Positional) |
+    bm("read-file", new ReadFile with Positional) |
+    bm("vau", new Vau with Positional) |
+    bm("weave", new Weave with Positional) |
+    bm("type-eq", new TypeEq with Positional) |
+    bm("type-of", new TypeOf with Positional) |
+    bm("bool-not", new BoolNot with Positional) |
+    bm("bool-eq", new BoolEq with Positional) |
+    bm("num-add", new NumAdd with Positional) |
+    bm("num-div", new NumDiv with Positional) |
+    bm("num-gt", new NumGT with Positional) |
+    bm("num-gte", new NumGTE with Positional) |
+    bm("num-eq", new NumEq with Positional) |
+    bm("num-lt", new NumLT with Positional) |
+    bm("num-lte", new NumLTE with Positional) |
+    bm("num-mult", new NumMult with Positional) |
+    bm("num-sub", new NumSub with Positional) |
+    bm("num-to-char-list", new NumToCharList with Positional) |
+    bm("sym-eq", new SymEq with Positional) |
+    bm("sym-to-char-list", new SymToCharList with Positional) |
+    bm("list-cons", new ListCons with Positional) |
+    bm("list-head", new ListHead with Positional) |
+    bm("list-empty?", new ListIsEmpty with Positional) |
+    bm("list-make", new ListMake with Positional) |
+    bm("list-tail", new ListTail with Positional) |
+    bm("vect-append", new VectToList with Positional) |
+    bm("vect-length", new VectLength with Positional) |
+    bm("vect-make", new VectMake with Positional) |
+    bm("vect-nth", new VectNth with Positional) |
+    bm("vect-prepend", new VectToList with Positional) |
+    bm("vect-to-list", new VectToList with Positional) |
+    bm("dict-contains", new DictContains with Positional) |
+    bm("dict-get", new DictGet with Positional) |
+    bm("dict-insert", new DictInsert with Positional) |
+    bm("dict-remove", new DictRemove with Positional) |
+    bm("dict-size", new DictSize with Positional) |
+    bm("dict-to-list", new DictToList with Positional) |
+    bm("trace", new Trace with Positional) |
+    bm("error", new WError with Positional))
 }

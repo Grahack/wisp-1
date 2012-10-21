@@ -13,14 +13,13 @@ class ParserSpec extends Specification {
       /* Writes the string to disk, then uses the reader to load it */
 
       import java.nio.file.Files
-      import java.io.FileOutputStream
       import java.nio.charset.Charset
       val path = Files.createTempFile("wisp_parser_test", ".wisp")
       val stream = Files.newBufferedWriter(path, Charset.forName("UTF-8"))
       stream.write("434")
       stream.close()
 
-      Parser(path)(0) must_== 434
+      Parser(scala.io.Source.fromFile(path.toFile())) must_== Seq(434)
     }
 
     "be able to read a numbers" in {
@@ -75,9 +74,9 @@ class ParserSpec extends Specification {
       //read
 
       read("(f (a b) c)") must_== List('f, List('a, 'b), 'c)
-      read("(f a ") must throwA
-      read("f a a)") must throwA
-      read("(f (a a)") must throwA
+      read("(f a ") must throwA[Throwable]
+      read("f a a)") must throwA[Throwable]
+      read("(f (a a)") must throwA[Throwable]
     }
 
     "work with leading/trailing slines" in {
@@ -118,6 +117,10 @@ class ParserSpec extends Specification {
 
   }
 
-  def read(s: String) = Parser(s)(0)
+  def read(s: String) = {
+    val r = Parser(s)
+    assert(r.value.length == 1)
+    r.value(0)
+  }
 
 }

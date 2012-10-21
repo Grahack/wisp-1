@@ -32,6 +32,6 @@ class InterpretterSpec extends Specification {
     }
   }
 
-  def interpret(s: String) = Interpretter(Parser(s)(0))
+  def interpret(s: String) = Interpretter(Parser(s).value(0))
 
 }

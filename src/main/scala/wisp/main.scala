@@ -2,6 +2,28 @@ package wisp
 
 object Main {
 
+  def main(args: Array[String]) {
+
+    if (args.isEmpty)
+      sys.error("Expect the name of the file(s) to interpret")
+
+    val fileSources = args
+      .map(java.nio.file.Paths.get(_))
+      .map(_.toFile())
+      .map(scala.io.Source.fromFile(_))
+
+    fileSources
+      .flatMap { x =>
+        val (forms, time) = timeFunc(Parser(x))
+        println("Parsing took: " + time)
+        forms.value
+      }
+      .foreach { x =>
+        val (res, time) = timeFunc(Interpretter(x))
+        println("Interpretting took: " + time)
+        println("Result: " + res)
+      }
+  }
   def timeFunc[A](fn: => A) = {
     val s = System.nanoTime
     val ret = fn
