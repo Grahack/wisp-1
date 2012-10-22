@@ -39,7 +39,8 @@
     </context>
 
     <context id="keyword" style-ref="keyword">
-      <prefix>#</prefix> 
+      <prefix>#</prefix>
+      <suffix>(?!\w)</suffix>
       <keyword>True</keyword>
       <keyword>False</keyword>
       <keyword>do</keyword>
@@ -47,42 +48,42 @@
       <keyword>if</keyword>
       <keyword>quote</keyword>
       <keyword>parse</keyword>
-      <keyword>read-file</keyword>
+      <keyword>read\-file</keyword>
       <keyword>vau</keyword>
       <keyword>weave</keyword>
-      <keyword>type-eq</keyword>
-      <keyword>type-of</keyword>
-      <keyword>bool-not</keyword>
-      <keyword>bool-eq</keyword>
-      <keyword>num-add</keyword>
-      <keyword>num-div</keyword>
-      <keyword>num-gt</keyword>
-      <keyword>num-gte</keyword>
-      <keyword>num-eq</keyword>
-      <keyword>num-lt</keyword>
-      <keyword>num-lte</keyword>
-      <keyword>num-mult</keyword>
-      <keyword>num-sub</keyword>
-      <keyword>num-to-char-list</keyword>
-      <keyword>sym-eq</keyword>
-      <keyword>sym-to-char-list</keyword>
-      <keyword>list-cons</keyword>
-      <keyword>list-head</keyword>
-      <keyword>list-empty?</keyword>
-      <keyword>list-make</keyword>
-      <keyword>list-tail</keyword>
-      <keyword>vect-append</keyword>
-      <keyword>vect-lengt</keyword>
-      <keyword>vect-make</keyword>
-      <keyword>vect-nth</keyword>
-      <keyword>vect-prepend</keyword>
-      <keyword>vect-to-list</keyword>
-      <keyword>dict-contains</keyword>
-      <keyword>dict-get</keyword>
-      <keyword>dict-insert</keyword>
-      <keyword>dict-remove</keyword>
-      <keyword>dict-size</keyword>
-      <keyword>dict-to-list</keyword>
+      <keyword>type\-eq</keyword>
+      <keyword>type\-of</keyword>
+      <keyword>bool\-not</keyword>
+      <keyword>bool\-eq</keyword>
+      <keyword>num\-add</keyword>
+      <keyword>num\-div</keyword>
+      <keyword>num\-gt</keyword>
+      <keyword>num\-gte</keyword>
+      <keyword>num\-eq</keyword>
+      <keyword>num\-lt</keyword>
+      <keyword>num\-lte</keyword>
+      <keyword>num\-mult</keyword>
+      <keyword>num\-sub</keyword>
+      <keyword>num\-to\-char\-list</keyword>
+      <keyword>sym\-eq</keyword>
+      <keyword>sym\-to\-char\-list</keyword>
+      <keyword>list\-cons</keyword>
+      <keyword>list\-head</keyword>
+      <keyword>list\-empty\?</keyword>
+      <keyword>list\-make</keyword>
+      <keyword>list\-tail</keyword>
+      <keyword>vect\-append</keyword>
+      <keyword>vect\-lengt</keyword>
+      <keyword>vect\-make</keyword>
+      <keyword>vect\-nth</keyword>
+      <keyword>vect\-prepend</keyword>
+      <keyword>vect\-to\-list</keyword>
+      <keyword>dict\-contains</keyword>
+      <keyword>dict\-get</keyword>
+      <keyword>dict\-insert</keyword>
+      <keyword>dict\-remove</keyword>
+      <keyword>dict\-size</keyword>
+      <keyword>dict\-to\-list</keyword>
       <keyword>trace</keyword>
       <keyword>error</keyword>
     </context>
