@@ -293,6 +293,7 @@ trait NumGT extends W {
 }
 
 trait NumGTE extends W {
+  override def toString = "NumGTE"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Bool(a.hostInt >= b.hostInt) with DerivedFrom { def from = fn }
@@ -300,6 +301,7 @@ trait NumGTE extends W {
 }
 
 trait NumEq extends W {
+  override def toString = "NumEq"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Bool(a.hostInt == b.hostInt) with DerivedFrom { def from = fn }
@@ -307,6 +309,7 @@ trait NumEq extends W {
 }
 
 trait NumLT extends W {
+  override def toString = "NumLT"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Bool(a.hostInt < b.hostInt) with DerivedFrom { def from = fn }
@@ -314,6 +317,7 @@ trait NumLT extends W {
 }
 
 trait NumLTE extends W {
+  override def toString = "NumLTE"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Bool(a.hostInt <= b.hostInt) with DerivedFrom { def from = fn }
@@ -321,6 +325,7 @@ trait NumLTE extends W {
 }
 
 trait NumMult extends W {
+  override def toString = "NumMult"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Num(a.hostInt * b.hostInt) with DerivedFrom { def from = fn }
@@ -328,6 +333,7 @@ trait NumMult extends W {
 }
 
 trait NumSub extends W {
+  override def toString = "NumSub"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Num(a.hostInt - b.hostInt) with DerivedFrom { def from = fn }
@@ -335,6 +341,7 @@ trait NumSub extends W {
 }
 
 trait NumToCharList extends W {
+  override def toString = "NumToCharList"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a) = fn.evaledArgs(env)
     new WList(a.hostInt.toString.map(x => new WChar(x)).toStream) with DerivedFrom { def from = fn }
@@ -344,6 +351,7 @@ trait NumToCharList extends W {
 // sym stuff
 
 trait SymEq extends W {
+  override def toString = "SymEq"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
     new Bool(a.hostSym == b.hostSym) with DerivedFrom { def from = fn }
@@ -351,6 +359,7 @@ trait SymEq extends W {
 }
 
 trait SymToCharList extends W {
+  override def toString = "SymToCharList"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(list) = fn.evaledArgs(env)
     new WList(list.hostSym.name.map(x => new WChar(x)).toStream) with DerivedFrom { def from = fn }
@@ -360,6 +369,7 @@ trait SymToCharList extends W {
 // list stuff
 
 trait ListCons extends W {
+  override def toString = "ListCons"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(list, value) = fn.evaledArgs(env)
     new WList(value #:: list.hostStream) with DerivedFrom { def from = fn }
@@ -400,6 +410,7 @@ trait ListTail extends W {
 }
 
 trait DictContains extends W {
+  override def toString = "DictContains"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(dict, key) = fn.evaledArgs(env)
     new Bool(dict.hostHashMap.contains(key)) with DerivedFrom { def from = fn }
@@ -407,6 +418,7 @@ trait DictContains extends W {
 }
 
 trait DictGet extends W {
+  override def toString = "DictGet"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(dict, key) = fn.evaledArgs(env)
     dict.hostHashMap(key)
@@ -414,6 +426,7 @@ trait DictGet extends W {
 }
 
 trait DictInsert extends W {
+  override def toString = "DictInsert"
   override def execute(fn: WList, env: HashMap[W, W]): W = {
     val Stream(dict: W, key: W, value: W) = fn.evaledArgs(env)
     val d = dict.hostHashMap
@@ -423,6 +436,7 @@ trait DictInsert extends W {
 }
 
 trait DictRemove extends W {
+  override def toString = "DictRemove"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(dict, key) = fn.evaledArgs(env)
     val d = dict.hostHashMap
@@ -432,6 +446,7 @@ trait DictRemove extends W {
 }
 
 trait DictSize extends W {
+  override def toString = "DictSize"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(dict) = fn.evaledArgs(env)
     new Num(dict.hostHashMap.size) with DerivedFrom { def from = fn }
@@ -439,6 +454,7 @@ trait DictSize extends W {
 }
 
 trait DictToList extends W {
+  override def toString = "DictToList"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(dict) = fn.evaledArgs(env)
     new WList(dict.hostHashMap.toStream.map(x => new WList(Stream(x._1, x._2)))) with DerivedFrom { def from = fn }
@@ -446,6 +462,7 @@ trait DictToList extends W {
 }
 
 trait Trace extends W {
+  override def toString = "Trace"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     println("Tracing: " + fn.evaledArgs(env).map(_.toString).mkString(" "))
     new WList(Stream()) with DerivedFrom { def from = fn }
@@ -453,6 +470,7 @@ trait Trace extends W {
 }
 
 trait WError extends W {
+  override def toString = "Error"
   override def execute(fn: WList, env: HashMap[W, W]) =
     sys.error("Code Error." + fn.evaledArgs(env).map(_.toString).mkString(", ")) // TODO: better info
 }
