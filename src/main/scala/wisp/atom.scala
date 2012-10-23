@@ -21,7 +21,7 @@ trait W {
   protected def err(op: String) = sys.error("Operation " + op + " not supported on: " + this)
 
   override def equals(o: Any): Boolean = sys.error("Not implemented")
-  
+
   override def hashCode: Int = toString.hashCode()
 }
 
@@ -69,12 +69,25 @@ class WList(val value: Stream[W]) extends W {
 
   def evaledArgs(e: HashMap[W, W]) = value.tail.map(Interpretter.eval(e, _))
 
-  override def toString =
-    if (value.forall(_.isInstanceOf[WChar])) {
-      '\'' + value.map(_.asInstanceOf[WChar].value).mkString + '\''
-    } else
-      "(" + value.map(_.toString).mkString(" ") + ")"
+  override def toString = asString.map('\'' + _ + '\'')
+    .getOrElse("(" + value.map(_.toString).mkString(" ") + ")")
+
   override def hashCode = value.hashCode()
+  
+  override def hostString = asString.get
+
+  private def asString: Option[String] = {
+    val sb = StringBuilder.newBuilder
+
+    value.foreach { c =>
+      if (c.isInstanceOf[WChar])
+        sb += c.asInstanceOf[WChar].value
+      else
+        return None
+    }
+
+    Some(sb.result)
+  }
 }
 
 class Num(val value: Int) extends W {
