@@ -40,8 +40,8 @@ class ParserSpec extends Specification {
 
     }
     "be able to read a string" in {
-      read("\"soup\"") must_== "soup"
-      read("\"\"") must_== ""
+      read("\"soup\"") must_== quoted('s', 'o', 'u', 'p')
+      read("\"\"") must_== quoted()
       read("\"tiger\"") must_== read("[~t ~i ~g ~e ~r]")
 
       val pos = read("100 \"robbers\"").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
@@ -54,15 +54,16 @@ class ParserSpec extends Specification {
 
       read("~a ~b ~3 ~d ~e ~f") must_== List('a', 'b', '3', 'd', 'e', 'f')
     }
-    "work with vectors" in {
-      read("[a b c]") must_== Seq('a, 'b, 'c)
-      read("[a [b 4]]") must_== Seq('a, Seq('b, 4))
+    "work with quoted lists" in {
+      read("[a b c]") must_== quoted('a, 'b, 'c)
+      read("[a [b 4]]") must_== quoted('a, quoted('b, 4))
     }
     "read a dict" in {
       read("{}") must_== HashMap()
       read("{key value}") must_== HashMap('key -> 'value)
-      read("{key value, 3 ~c, \"cat\" 44}") must_== HashMap('key -> 'value, 3 -> 'c', "cat" -> 44)
-      //read("{key value, 3 ~c, \"cat\" 44}") must_== HashMap('key -> 'value, 3 -> 'c', "cat" -> 44)
+      read("{key value, 3 ~c, \"cat\" 44}") must_== HashMap('key -> 'value, 3 -> 'c', quoted('c', 'a', 't') -> 44)
+      ok //must_== HashMap('key -> 'value, 3 -> 'c', quoted('c', 'a', 't') -> 44)
+      //read("{key value, 3 ~c, \"cat\" 44}") must_== 
     }
     "handle explicit function calls / lists" in {
       read("(f a b)") must_== List('f, 'a, 'b)
@@ -115,6 +116,10 @@ class ParserSpec extends Specification {
       pos.column must_== 2
     }
 
+  }
+  
+  def quoted[T](elems: T*) = {
+    new ListMake {} +: elems
   }
 
   def read(s: String) = {

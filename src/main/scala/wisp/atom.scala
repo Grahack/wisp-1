@@ -19,6 +19,10 @@ trait W {
   def execute(fn: WList, env: HashMap[W, W]): W = err("execute")
 
   protected def err(op: String) = sys.error("Operation " + op + " not supported on: " + this)
+
+  override def equals(o: Any): Boolean = sys.error("Not implemented")
+  
+  override def hashCode: Int = toString.hashCode()
 }
 
 class Bool(val value: Boolean) extends W {
@@ -67,39 +71,10 @@ class WList(val value: Stream[W]) extends W {
 
   override def toString =
     if (value.forall(_.isInstanceOf[WChar])) {
-      "(list " + value.map(_.asInstanceOf[WChar].value).mkString + ")"
+      '\'' + value.map(_.asInstanceOf[WChar].value).mkString + '\''
     } else
       "(" + value.map(_.toString).mkString(" ") + ")"
   override def hashCode = value.hashCode()
-}
-
-class Vect(val value: IndexedSeq[W]) extends W {
-  override def toString = asString.map('"' + _ + '"').getOrElse(value.mkString(" "))
-  override def hostVect = value
-  override def equals(o: Any) =
-    o match {
-      case l: Vect => value == l.value
-      case s: Seq[_] => value == s
-      case st: String => asString.map(_ == st).getOrElse(false)
-      case _ => false
-    }
-
-  override def hostString = asString.get
-
-  private def asString: Option[String] = {
-    val builder = StringBuilder.newBuilder
-
-    value.foreach { x =>
-      if (x.isInstanceOf[WChar])
-        builder += x.asInstanceOf[WChar].value
-      else
-        return None
-    }
-
-    Some(builder.result)
-  }
-
-  override def hashCode = asString.map(_.hashCode).getOrElse(value.hashCode)
 }
 
 class Num(val value: Int) extends W {
@@ -392,11 +367,14 @@ trait ListIsEmpty extends W {
     val Stream(list) = fn.evaledArgs(env)
     new Bool(list.hostStream.isEmpty) with DerivedFrom { def from = fn }
   }
+  override def equals(o: Any) = o.isInstanceOf[ListIsEmpty]
 }
 
 trait ListMake extends W {
+  override def toString = "ListMake"
   override def execute(fn: WList, env: HashMap[W, W]) =
     new WList(fn.evaledArgs(env)) with DerivedFrom { def from = fn }
+  override def equals(o: Any) = o.isInstanceOf[ListMake]
 }
 
 trait ListTail extends W {
@@ -405,46 +383,7 @@ trait ListTail extends W {
     val Stream(list) = fn.evaledArgs(env)
     new WList(list.hostStream.tail) with DerivedFrom { def from = fn }
   }
-}
-
-trait VectAppend extends W {
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(list, value) = fn.evaledArgs(env)
-    new Vect(list.hostVect :+ value) with DerivedFrom { def from = fn }
-  }
-}
-
-trait VectLength extends W {
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(list) = fn.evaledArgs(env)
-    new Num(list.hostVect.length) with DerivedFrom { def from = fn }
-  }
-}
-
-trait VectMake extends W {
-  override def execute(fn: WList, env: HashMap[W, W]) =
-    new Vect(fn.evaledArgs(env).toIndexedSeq) with DerivedFrom { def from = fn }
-}
-
-trait VectNth extends W {
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(vect, index) = fn.evaledArgs(env)
-    vect.hostVect(index.hostInt)
-  }
-}
-
-trait VectPrepend extends W {
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(vect, value) = fn.evaledArgs(env)
-    new Vect(value +: vect.hostVect) with DerivedFrom { def from = fn }
-  }
-}
-
-trait VectToList extends W {
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(vect) = fn.evaledArgs(env)
-    new WList(vect.hostVect.toStream) with DerivedFrom { def from = fn }
-  }
+  override def equals(o: Any) = o.isInstanceOf[ListTail]
 }
 
 trait DictContains extends W {

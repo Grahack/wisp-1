@@ -14,8 +14,8 @@ class InterpretterSpec extends Specification {
       interpret("#False") must_== false
     }
     
-    "Work with quotes things" in {
-      interpret("\"roller\"") must_== "roller"
+    "Work with quoted things" in {
+      interpret("\"roller\"") must_== Seq('r', 'o', 'l', 'l', 'e', 'r')
       interpret("[1 2 3 4 5]") must_== Seq(1, 2, 3, 4, 5)
       interpret("[1 2 [3 4 5]]") must_== Seq(1, 2, Seq(3, 4, 5))
       interpret("#quote 4") must_== 4

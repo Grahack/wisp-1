@@ -64,7 +64,10 @@ object Parser extends Parsers {
     positioned('(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (x => new WList(x.toStream) with Positional))
 
   private def literalVectParser = {
-    positioned('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ (x => new Vect(x.toIndexedSeq) with Positional))
+    positioned('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ { x =>
+      val mk = new ListMake {}
+      new WList(mk #:: (x.toStream: Stream[W])) with Positional
+    })
   }
 
   // {key value, key value, key value} 
@@ -102,7 +105,10 @@ object Parser extends Parsers {
       c == ',' || c == '#' ||
       c == '{' || c == '}'
 
-  private def literalStringParser = '"' ~> rep(positioned(insideLiteralParser ^^ (new WChar(_) with Positional))) ~< '"' ^^ (x => new Vect(x.toIndexedSeq) with Positional)
+  private def literalStringParser = '"' ~> rep(positioned(insideLiteralParser ^^ (new WChar(_) with Positional))) ~< '"' ^^ { x =>
+    val mk = new ListMake {}
+    new WList(mk #:: (x.toStream: Stream[W])) with Positional
+   }
 
   // TODO: allow string escaping
   private def insideLiteralParser = acceptIf(x => x != '"' && x != '\n')("Unexpected '" + _ + "' when parsing inside a literal string")
@@ -156,12 +162,6 @@ object Parser extends Parsers {
     bm("list-empty?", new ListIsEmpty with Positional) |
     bm("list-make", new ListMake with Positional) |
     bm("list-tail", new ListTail with Positional) |
-    bm("vect-append", new VectToList with Positional) |
-    bm("vect-length", new VectLength with Positional) |
-    bm("vect-make", new VectMake with Positional) |
-    bm("vect-nth", new VectNth with Positional) |
-    bm("vect-prepend", new VectToList with Positional) |
-    bm("vect-to-list", new VectToList with Positional) |
     bm("dict-contains", new DictContains with Positional) |
     bm("dict-get", new DictGet with Positional) |
     bm("dict-insert", new DictInsert with Positional) |
