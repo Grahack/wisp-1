@@ -139,10 +139,11 @@ trait Eval extends W {
   // implementation in Interpretter, for tail-calls
 }
 
+/* This is a disgusting macro */
 trait Weave extends W {
   override def toString = "Weave"
   override def execute(fn: WList, env: HashMap[W, W]) = {
-    val args = fn.evaledArgs(env)
+    val args = fn.value.tail
     require(args.nonEmpty, "Weave needs at least one argument") // and probably at least two is recommend?
 
     args.tail.foreach { form =>
@@ -151,7 +152,9 @@ trait Weave extends W {
     }
 
     args.tail.map(_.asInstanceOf[WList]).foldLeft(args.head) { (a, b) =>
-      new WList(b.value.head #:: a #:: b.value.tail) with DerivedFrom { def from = fn }
+      val env = a.asInstanceOf[Dict].value
+      val form = new WList(b.value.head #:: a #:: b.value.tail) with DerivedFrom { def from = fn }
+      Interpretter.eval(env, form)
     }
   }
 }
