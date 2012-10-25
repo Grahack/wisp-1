@@ -39,7 +39,7 @@ object Parser extends Parsers {
     repN(depth, '\t') ~>
       positioned(
         rep1sep(atomParser, singleSpace) ~
-          rep(rep(blankLine) ~> lineParser(depth + 1)) ^^ (x => stitch(x._1, x._2)))
+          rep(rep1(blankLine) ~> lineParser(depth + 1)) ^^ (x => stitch(x._1, x._2)))
 
   private def stitch(a: Seq[W with Positional], b: Seq[W with Positional]) = {
     assert(a.length >= 1)
