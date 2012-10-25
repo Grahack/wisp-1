@@ -40,8 +40,8 @@ class ParserSpec extends Specification {
 
     }
     "be able to read a string" in {
-      read("\"soup\"") must_== quoted('s', 'o', 'u', 'p')
-      read("\"\"") must_== quoted()
+      read("\"soup\"") must_== Seq(new ListMake {}, 's', 'o', 'u', 'p')
+      read("\"\"") must_== Seq(new ListMake {})
       read("\"tiger\"") must_== read("[~t ~i ~g ~e ~r]")
 
       val pos = read("100 \"robbers\"").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
@@ -52,18 +52,19 @@ class ParserSpec extends Specification {
     "can read chars" in {
       read("~q") must_== 'q'
 
-      read("~a ~b ~3 ~d ~e ~f") must_== List('a', 'b', '3', 'd', 'e', 'f')
+      read("~a ~b ~3 ~d ~e ~f") must_== Seq('a', 'b', '3', 'd', 'e', 'f')
     }
     "work with quoted lists" in {
-      read("[a b c]") must_== quoted('a, 'b, 'c)
-      read("[a [b 4]]") must_== quoted('a, quoted('b, 4))
+      read("[a b c]") must_== Seq(new ListMake {}, 'a, 'b, 'c)
+      read("[a [b 4]]") must_== Seq(new ListMake {}, 'a, Seq(new ListMake {}, 'b, 4))
     }
     "read a dict" in {
-      read("{}") must_== HashMap()
-      read("{key value}") must_== HashMap('key -> 'value)
-      read("{key value, 3 ~c, \"cat\" 44}") must_== HashMap('key -> 'value, 3 -> 'c', quoted('c', 'a', 't') -> 44)
-      ok //must_== HashMap('key -> 'value, 3 -> 'c', quoted('c', 'a', 't') -> 44)
-      //read("{key value, 3 ~c, \"cat\" 44}") must_== 
+      read("{}") must_== Seq(new DictMake {})
+      read("{\"soup\" key}") must_== Seq(new DictMake {}, Seq(new ListMake {}, Seq(new ListMake {}, 's', 'o', 'u', 'p'), 'key))
+      read("{key value, \"dog\" 44, ~f 50}") must_== Seq(new DictMake {},
+          Seq(new ListMake {}, 'key, 'value),
+          Seq(new ListMake {},  Seq(new ListMake {}, 'd', 'o', 'g'), 44),
+          Seq(new ListMake {}, 'f', 50))
     }
     "handle explicit function calls / lists" in {
       read("(f a b)") must_== List('f, 'a, 'b)
@@ -116,10 +117,6 @@ class ParserSpec extends Specification {
       pos.column must_== 2
     }
 
-  }
-  
-  def quoted[T](elems: T*) = {
-    new ListMake {} +: elems
   }
 
   def read(s: String) = {

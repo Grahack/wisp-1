@@ -32,15 +32,14 @@ object Parser extends Parsers {
   }
 
   private def fileParser: Parser[WList with Positional] = {
-    positioned(rep(eol) ~> repsep(lineParser(0), rep1(eol)) ~< rep(eol) ^^ (x => new WList(x.toStream) with Positional))
+    positioned(rep(blankLine) ~> repsep(lineParser(0), rep1(blankLine)) ~< rep(blankLine) ^^ (x => new WList(x.toStream) with Positional))
   }
 
   private def lineParser(depth: Int): Parser[W with Positional] =
-    rep(blankLine) ~>
-      repN(depth, '\t') ~>
+    repN(depth, '\t') ~>
       positioned(
         rep1sep(atomParser, singleSpace) ~
-          rep(lineParser(depth + 1)) ^^ (x => stitch(x._1, x._2)))
+          rep(rep(blankLine) ~> lineParser(depth + 1)) ^^ (x => stitch(x._1, x._2)))
 
   private def stitch(a: Seq[W with Positional], b: Seq[W with Positional]) = {
     assert(a.length >= 1)
@@ -72,9 +71,13 @@ object Parser extends Parsers {
 
   // {key value, key value, key value} 
   private def literalDictParser = positioned('{' ~> opt(singleSpace) ~> repsep(dictPairParser, ',' ~ singleSpace) ~< opt(singleSpace) <~ '}' ^^
-    (x => new Dict(listToHashMap(x.map(y => y._1 -> y._2))) with Positional))
+    { x =>
+      val dm = new DictMake {}
+      val stream: Stream[W] = x.toStream
+      new WList(dm #:: stream) with Positional
+    })
 
-  private def dictPairParser = atomParser ~< singleSpace ~ atomParser
+  private def dictPairParser = atomParser ~< singleSpace ~ atomParser ^^ (x => new WList(Stream(new ListMake {}, x._1, x._2)) with Positional)
 
   private def listToHashMap[A, B](values: List[(A, B)]): HashMap[A, B] = values.foldLeft(HashMap[A, B]()) {
     (state, next) =>
@@ -108,7 +111,7 @@ object Parser extends Parsers {
   private def literalStringParser = '"' ~> rep(positioned(insideLiteralParser ^^ (new WChar(_) with Positional))) ~< '"' ^^ { x =>
     val mk = new ListMake {}
     new WList(mk #:: (x.toStream: Stream[W])) with Positional
-   }
+  }
 
   // TODO: allow string escaping
   private def insideLiteralParser = acceptIf(x => x != '"' && x != '\n')("Unexpected '" + _ + "' when parsing inside a literal string")
@@ -118,7 +121,7 @@ object Parser extends Parsers {
 
   private def charListToSymbol(letters: List[Char]) = Symbol(new String(letters.toArray))
 
-  private def eol = elem('\n') // warn if retarded-end line found?
+  private def eol = elem('\n') // probably should support windows-endline, but meh
 
   private def singleSpace = elem(' ')
 

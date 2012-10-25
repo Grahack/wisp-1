@@ -72,7 +72,7 @@ class WList(val value: Stream[W]) extends W {
   override def toString = asString.map('\'' + _ + '\'')
     .getOrElse("(" + value.map(_.toString).mkString(" ") + ")")
 
-  override def hashCode = value.hashCode()
+  override def hashCode = 0
   
   override def hostString = asString.get
 
@@ -145,16 +145,21 @@ trait Weave extends W {
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val args = fn.value.tail
     require(args.nonEmpty, "Weave needs at least one argument") // and probably at least two is recommend?
+    
+    val fst = Interpretter.eval(env, args.head)
+    require(fst.isInstanceOf[Dict])
+    val rst = args.tail
 
-    args.tail.foreach { form =>
+    rst.foreach { form =>
       require(form.isInstanceOf[WList], "Expected: " + form + " to be a WList")
       require(form.asInstanceOf[WList].value.nonEmpty, "Expected: " + form + " to be non-empty")
     }
 
-    args.tail.map(_.asInstanceOf[WList]).foldLeft(args.head) { (a, b) =>
+    rst.map(_.asInstanceOf[WList]).foldLeft(fst) { (a, b) =>
+      require(a.isInstanceOf[Dict], "Weave expected: " + a + " to be an instance of Dict")
       val env = a.asInstanceOf[Dict].value
       val form = new WList(b.value.head #:: a #:: b.value.tail) with DerivedFrom { def from = fn }
-      Interpretter.eval(env, form)
+      Interpretter.eval(env, form) // TODO: the last call could be TCO
     }
   }
 }
@@ -462,6 +467,21 @@ trait DictToList extends W {
     val Stream(dict) = fn.evaledArgs(env)
     new WList(dict.hostHashMap.toStream.map(x => new WList(Stream(x._1, x._2)))) with DerivedFrom { def from = fn }
   }
+}
+
+trait DictMake extends W {
+  override def toString = "DictMake"
+  override def execute(fn: WList, env: HashMap[W,W]) = {
+    val pairs = fn.evaledArgs(env).map(x => {
+      require(x.isInstanceOf[WList])
+      val l = x.asInstanceOf[WList].value
+      require(l.length== 2)
+      (l(0), l(1))
+    })
+    
+    new Dict(HashMap(pairs.toSeq: _*)) with DerivedFrom { def from = fn }
+  }
+  override def equals(o: Any) = o.isInstanceOf[DictMake]
 }
 
 trait Trace extends W {
