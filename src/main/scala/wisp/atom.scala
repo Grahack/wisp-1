@@ -73,7 +73,7 @@ class WList(val value: Stream[W]) extends W {
     .getOrElse("(" + value.map(_.toString).mkString(" ") + ")")
 
   override def hashCode = 0
-  
+
   override def hostString = asString.get
 
   private def asString: Option[String] = {
@@ -142,25 +142,25 @@ trait Eval extends W {
 /* This is a disgusting macro */
 trait Weave extends W {
   override def toString = "Weave"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val args = fn.value.tail
-    require(args.nonEmpty, "Weave needs at least one argument") // and probably at least two is recommend?
-    
-    val fst = Interpretter.eval(env, args.head)
-    require(fst.isInstanceOf[Dict])
-    val rst = args.tail
+  override def execute(fn: WList, e: HashMap[W, W]) = {
 
-    rst.foreach { form =>
-      require(form.isInstanceOf[WList], "Expected: " + form + " to be a WList")
-      require(form.asInstanceOf[WList].value.nonEmpty, "Expected: " + form + " to be non-empty")
+    require(fn.value.length >= 3, "Expected: " + fn + " to contain at least 3 forms")
+
+    def doIt(args: Stream[W], env: HashMap[W, W]): W = args match {
+      case Stream(one) => Interpretter.eval(env, one)
+      case first #:: next #:: rest => {
+        val newEnv = Interpretter.eval(env, first).asInstanceOf[Dict]
+        require(next.isInstanceOf[WList])
+        val nextHead = next.asInstanceOf[WList].value
+        require(nextHead.nonEmpty)
+        val remade = new WList(nextHead.head #:: newEnv #:: nextHead.tail) with DerivedFrom { def from = fn }
+
+        doIt(remade #:: rest, newEnv.value)
+      }
+      case x => sys.error("Weave found unexpected: " + x)
     }
 
-    rst.map(_.asInstanceOf[WList]).foldLeft(fst) { (a, b) =>
-      require(a.isInstanceOf[Dict], "Weave expected: " + a + " to be an instance of Dict")
-      val env = a.asInstanceOf[Dict].value
-      val form = new WList(b.value.head #:: a #:: b.value.tail) with DerivedFrom { def from = fn }
-      Interpretter.eval(env, form) // TODO: the last call could be TCO
-    }
+    doIt(fn.value.tail, e) // FWIW this can be a tail call if put in interpretter.scala
   }
 }
 
@@ -188,6 +188,7 @@ trait Vau extends W {
   override def toString = "Vau"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(aS, eS, code) = fn.evaledArgs(env)
+
     // not entirely sure special casing _ is overly nice, but it seems to work well in practice
     require(aS.isInstanceOf[Sym], "Vau expects that the arg is a symbol, got: " + aS)
 
@@ -471,14 +472,14 @@ trait DictToList extends W {
 
 trait DictMake extends W {
   override def toString = "DictMake"
-  override def execute(fn: WList, env: HashMap[W,W]) = {
+  override def execute(fn: WList, env: HashMap[W, W]) = {
     val pairs = fn.evaledArgs(env).map(x => {
       require(x.isInstanceOf[WList])
       val l = x.asInstanceOf[WList].value
-      require(l.length== 2)
+      require(l.length == 2)
       (l(0), l(1))
     })
-    
+
     new Dict(HashMap(pairs.toSeq: _*)) with DerivedFrom { def from = fn }
   }
   override def equals(o: Any) = o.isInstanceOf[DictMake]
