@@ -122,46 +122,12 @@ trait If extends W {
   // implementation in Interpretter, for tail-calls
 }
 
-// Takes multiple arguments, returns the value the last one.
-trait Do extends W {
-  override def toString = "Do"
-  // TODO: We'll have to implement this in Interpretter if we want to tail call the last arg :(
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    fn.evaledArgs(env).last // This is rather dodgy, as it relies on scala's streams stupidnesss to evaluate everything
-  }
-}
-
 // Takes two arguments, the form and the environment. Then evaluates the form using
 // the environment. Remember this function is strict, so the arguments are "double"
 // evaluated
 trait Eval extends W {
   override def toString = "Eval"
   // implementation in Interpretter, for tail-calls
-}
-
-/* This is a disgusting macro */
-trait Weave extends W {
-  override def toString = "Weave"
-  override def execute(fn: WList, e: HashMap[W, W]) = {
-
-    require(fn.value.length >= 3, "Expected: " + fn + " to contain at least 3 forms")
-
-    def doIt(args: Stream[W], env: HashMap[W, W]): W = args match {
-      case Stream(one) => Interpretter.eval(env, one)
-      case first #:: next #:: rest => {
-        val newEnv = Interpretter.eval(env, first).asInstanceOf[Dict]
-        require(next.isInstanceOf[WList])
-        val nextHead = next.asInstanceOf[WList].value
-        require(nextHead.nonEmpty)
-        val remade = new WList(nextHead.head #:: newEnv #:: nextHead.tail) with DerivedFrom { def from = fn }
-
-        doIt(remade #:: rest, newEnv.value)
-      }
-      case x => sys.error("Weave found unexpected: " + x)
-    }
-
-    doIt(fn.value.tail, e) // FWIW this can be a tail call if put in interpretter.scala
-  }
 }
 
 trait ReadFile extends W {
@@ -241,6 +207,11 @@ trait Quote extends W {
     fn.value(1)
   }
   override def equals(o: Any) = o.isInstanceOf[Quote]
+}
+
+trait Sequence extends W {
+  override def toString = "Sequence"
+  // impl in interpretter for tail-calls
 }
 
 trait TypeEq extends W {
@@ -488,13 +459,16 @@ trait DictMake extends W {
 trait Trace extends W {
   override def toString = "Trace"
   override def execute(fn: WList, env: HashMap[W, W]) = {
-    println("Tracing: " + fn.evaledArgs(env).map(_.toString).mkString(" "))
-    new WList(Stream()) with DerivedFrom { def from = fn }
+    val args = fn.evaledArgs(env)
+    require(args.length >= 1)
+    println("Tracing: " + args.mkString(" "))
+
+    args.last
   }
 }
 
 trait WError extends W {
   override def toString = "Error"
   override def execute(fn: WList, env: HashMap[W, W]) =
-    sys.error("Code Error." + fn.evaledArgs(env).map(_.toString).mkString(", ")) // TODO: better info
+    sys.error("Code Error." + fn.evaledArgs(env).mkString(", ")) // TODO: better info
 }

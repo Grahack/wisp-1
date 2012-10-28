@@ -91,11 +91,6 @@ object Parser extends Parsers {
   private def digitParser: Parser[Int] =
     acceptIf(c => c.isDigit)(c => "Unexpected '" + c + "' when looking for a digit") ^^ (_.asDigit)
 
-  //  private def builtInParser = WBuiltIn.all.map {
-  //    x => accept( x.name.name.toList) ^^ (_ => x)
-  //  }.reduce((a,b) => a|b)
-  //
-
   private def symbolParser = positioned(rep1(
     acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ (x => new Sym(charListToSymbol(x)) with Positional))
 
@@ -136,14 +131,13 @@ object Parser extends Parsers {
   private def builtInSymbolParser = '#' ~> (
     bm("True", new Bool(true) with Positional) |
     bm("False", new Bool(false) with Positional) |
-    bm("do", new Do with Positional) |
     bm("eval", new Eval with Positional) |
     bm("if", new If with Positional) |
     bm("quote", new Quote with Positional) |
+    bm("sequence", new Sequence with Positional) |
     bm("parse", new Parse with Positional) |
     bm("read-file", new ReadFile with Positional) |
     bm("vau", new Vau with Positional) |
-    bm("weave", new Weave with Positional) |
     bm("type-eq", new TypeEq with Positional) |
     bm("type-of", new TypeOf with Positional) |
     bm("bool-not", new BoolNot with Positional) |
@@ -168,6 +162,7 @@ object Parser extends Parsers {
     bm("dict-contains", new DictContains with Positional) |
     bm("dict-get", new DictGet with Positional) |
     bm("dict-insert", new DictInsert with Positional) |
+    bm("dict-make", new DictMake with Positional) |
     bm("dict-remove", new DictRemove with Positional) |
     bm("dict-size", new DictSize with Positional) |
     bm("dict-to-list", new DictToList with Positional) |
