@@ -13,7 +13,6 @@ Wisp is a whitespace lisp. It is designed to be extremely powerful and flexible,
 Status
 ======
 
-  * [![Build Status](https://secure.travis-ci.org/espringe/wisp.png)](http://travis-ci.org/espringe/wisp)
   * Language fundamentals **Done**
   * Simple interpretter **Done**
   * Core library **In progress**
@@ -26,35 +25,21 @@ Status
 Building
 ========
 
-Wisp is currently written in Scala, which unfortunately is on the JVM. Eventually wisp will be hosted ontop of javascript, but in the mean time you will need `sbt` (scala build tool) to build, which will also handle getting the dependencies (inclusive of scala).
+The most complete implementation of wisp is written in Scala, so if you want to try wisp -- that's definitely the way to go. The goal will be to self-host, but this has proven to be a dauntingly large task, and won't happen immediately. In the mean time, Scala has unfortunately proven to be largely unsuitable for writing an interpretter (completely ridiculous startup times, slow, and a total pain in the ass to "deploy" to anyone fortunate enough to not have the jvm on their system. So I'm looking into using rewriting it in haskell. In the mean time, you'll have to use the scala version:
 
   * [Download sbt](http://www.scala-sbt.org/download.html) (don't worry, its quite painless)
   * `git clone https://github.com/espringe/wisp.git`
-  * `cd wisp`
-  * `sbt assembly` (have patience: the combination of the scala compiler, maven repositories and jvm is wrist-cuttingly slow)
+  * `cd wisp/scala`
+  * `sbt assembly` (have patience: the combination of the scala compiler, maven repositories and jvm is wrist-cuttingly slow -- go have two or three coffees)
 
 
 Running
 =======
 
-Either run the `./wisp` script, or if you prefer there is a self-contained jar at `target/wisp.jar`
+There's a launcher script `./scala/wisp <file.wisp>`, or a self-contained jar at `target/wisp.jar`, or if you don't want to pay for jvm startup each time, you can launch `sbt` and from within the console type: `run <file.wisp>` (which will run, and return you to the sbt console)
 
 ```
-usage: wisp [-i | -w] file-to-interpret.wisp
-
-Valid options are:
-         
-  -i        Interactive. After running the program, drop into
-            an interactive repl session
-          
-          OR
-
-  -w        Watch. After running the program, watch the file
-            and its transitive dependencies for any changes. If
-            any files change, rerun the program
-```
-
-Both options are extremely useful for wisp development
+usage: wisp file-to-interpret.wisp
 
 
 Documentation
