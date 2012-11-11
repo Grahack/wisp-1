@@ -160,12 +160,12 @@ eval (WList (rawFn:rawArgs)) env =
      niceError s = error $ "Can't evalute: " ++ s ++ " as a function. Raw function was: " ++ (show rawFn) ++ " with args " ++ (show rawArgs) 
      typeof :: W -> BuiltinType
      typeof w = case w of
-         WChar _ -> CharType
-         WNum _ -> NumType
-         WList _ -> ListType
-         WDict _ -> DictType
-         WSym _ -> SymType
          WBool _ -> BoolType
+         WChar _ -> CharType
+         WDict _ -> DictType
+         WList _ -> ListType
+         WNum _ -> NumType
+         WSym _ -> SymType
          WType _ -> TypeType
          _ -> FuncType
 eval x _ = return $ x
@@ -187,16 +187,16 @@ atom =
             Just v -> (WList [a, v])     
   <?> "atom"
 
-prettyPrint :: W -> String
-prettyPrint w = case w of
+format :: W -> String
+format w = case w of
                    WBool True -> "#True"
                    WBool False -> "#False"
-                   WChar c -> ['~', c] 
+                   WChar c -> ['~', c]
                    WNum n -> show n
                    WList l -> build `DMB.fromMaybe` formatted
                      where
                         build :: String
-                        build = "(" ++ unwords (prettyPrint `map` l) ++ ")"
+                        build = "(" ++ unwords (format `map` l) ++ ")"
                         formatted :: Maybe String
                         formatted = (\x -> '#' : (show x)) `fmap` asString -- Better escaping than just 'show'
                         asString :: Maybe String
@@ -204,13 +204,60 @@ prettyPrint w = case w of
                            where f :: W -> Maybe String -> Maybe String
                                  f (WChar c) (Just state) = Just $ c:state
                                  f _ _ = Nothing 
-                   WDict d -> "{" ++ unwords (format <$> asList) ++ "}"
+                   WDict d -> "{" ++ unwords (formatPair <$> asList) ++ "}"
                      where asList = DM.toList d
-                           format :: (W, W) -> String
-                           format (k,v) = "[" ++ (prettyPrint k) ++ " " ++ (prettyPrint v) ++ "]"
+                           formatPair :: (W, W) -> String
+                           formatPair (k,v) = "[" ++ (format k) ++ " " ++ (format v) ++ "]"
                    WSym s -> s -- TODO: escaping
-                   x -> show x -- TODO: something nice
-                   
+                   WType t -> case t of
+                     BoolType -> "#Bool"
+                     CharType -> "#Char"
+                     DictType -> "#Dict"
+                     FuncType -> "#Func"
+                     ListType -> "#List"
+                     NumType -> "#Num"
+                     SymType -> "#Sym"
+                     TypeType -> "#Type"
+                   WVauRun _ _ _ _ -> "#UDF"
+                   WEval -> "#eval"
+                   WIf -> "#if"
+                   WParse -> "#parse"
+                   WQuote -> "#quote"
+                   WSequence -> "#sequence"
+                   WReadFile -> "#read-file"
+                   WVau -> "#vau"
+                   WTypeEq -> "#type-eq"
+                   WTypeOf -> "#type-of"
+                   WBoolEq -> "#bool-eq"
+                   WBoolNot -> "#bool-not"
+                   WCharEq -> "#char-not"
+                   WCharToNum -> "#char-to-num"
+                   WNumAdd -> "#num-add"
+                   WNumDiv -> "#num-div"
+                   WNumGT -> "#num-gt"
+                   WNumGTE -> "#num-gte"
+                   WNumEq -> "#num-eq"
+                   WNumLT -> "#num-lt"
+                   WNumLTE -> "#num-lte"
+                   WNumMult -> "#num-mult"
+                   WNumSub -> "#num-sub"
+                   WNumToCharList -> "#num-to-char-list"
+                   WSymEq -> "#sym-eq"
+                   WSymToCharList -> "#sym-to-char-list"
+                   WListCons -> "#list-cons"
+                   WListHead -> "#list-head"
+                   WListIsEmpty -> "#list-empty?"
+                   WListMake -> "#list-make"
+                   WListTail -> "#list-tail"
+                   WDictContains -> "#dict-contains"
+                   WDictGet -> "#dict-get"
+                   WDictInsert -> "#dict-insert"
+                   WDictMake -> "#dict-make"
+                   WDictRemove -> "#dict-remove"
+                   WDictSize -> "#dict-size"
+                   WDictToList -> "#dict-to-list"
+                   WTrace -> "#trace"
+                   WError -> "#error"
 
 file_parser :: Parser [W]
 file_parser = do _ <- many blank_line
@@ -270,50 +317,19 @@ escape_char = char '\\' >> (
      escape_pair (s, c) = c <$ try (string s)
 
 builtin_symbol :: Parser W
-builtin_symbol = do _ <- char '#'
-                    builtin_pairs reader_symbols
+builtin_symbol = builtin_pairs readerSymbols
    where
       builtin_pairs :: [(String, W)] -> Parser W
       builtin_pairs l = choice $ builtin_pair <$> l
-      reader_symbols :: [(String, W)]
-      reader_symbols =  [("True", WBool True)
-                        ,("False", WBool False)
-                        ,("eval", WEval)
-                        ,("if", WIf)
-                        ,("quote", WQuote)
-                        ,("sequence", WSequence)
-                        ,("parse", WParse)
-                        ,("read-file", WReadFile)
-                        ,("vau", WVau)
-                        ,("type-eq", WTypeEq)
-                        ,("type-of", WTypeOf)
-                        ,("bool-not", WBoolNot)
-                        ,("bool-eq", WBoolEq)
-                        ,("char-eq", WCharEq)
-                        ,("char-to-num", WCharToNum)
-                        ,("num-add", WNumAdd)
-                        ,("num-div", WNumDiv)
-                        ,("num-gt", WNumGT)
-                        ,("num-gte", WNumGTE)
-                        ,("num-eq", WNumEq)
-                        ,("num-lt", WNumLT)
-                        ,("num-lte", WNumLTE)
-                        ,("num-mult", WNumMult)
-                        ,("num-sub", WNumSub)
-                        ,("num-to-char-list", WNumToCharList)
-                        ,("list-cons", WListCons)
-                        ,("list-head", WListHead)
-                        ,("list-is-empty", WListIsEmpty)
-                        ,("list-make", WListMake)
-                        ,("list-tail", WListTail)
-                        ,("dict-contains", WDictContains)
-                        ,("dict-get", WDictGet)
-                        ,("dict-insert", WDictInsert)
-                        ,("dict-make", WDictMake)
-                        ,("dict-size", WDictSize)
-                        ,("dict-to-list", WDictToList)
-                        ,("trace", WTrace)
-                        ,("error", WError)]
+      readerSymbols :: [(String, W)]
+      readerSymbols = (\x -> (format x, x)) `map` [WBool True, WBool False, WEval, WIf, WQuote, WSequence, WParse, WReadFile, WVau, WTypeEq, WTypeOf
+                      ,WType BoolType, WType CharType, WType DictType, WType FuncType, WType ListType, WType NumType, WType SymType, WType TypeType
+                      ,WBoolNot, WBoolEq
+                      ,WCharEq, WCharToNum
+                      ,WNumAdd, WNumDiv, WNumGT, WNumGTE, WNumEq, WNumLT, WNumLTE, WNumMult, WNumSub, WNumToCharList
+                      ,WListCons, WListHead, WListIsEmpty, WListMake, WListTail
+                      ,WDictContains, WDictGet, WDictInsert, WDictMake, WDictSize, WDictToList
+                      ,WTrace, WError]
       builtin_pair :: (String, W) -> Parser W
       builtin_pair (symbol, wvalue) = wvalue <$ try (string symbol)
 
@@ -372,4 +388,4 @@ main =
             Left e  -> do putStrLn "Error parsing input:"
                           print e
             Right a -> do r <- eval a DM.empty
-                          putStrLn $ prettyPrint r
+                          putStrLn $ format r
