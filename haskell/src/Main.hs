@@ -7,6 +7,7 @@ import           Control.Applicative                (Applicative, pure, (*>),
 import           Text.ParserCombinators.Parsec
 import qualified Text.ParserCombinators.Parsec.Char as PC
 import qualified Data.Map as DM
+import qualified Data.Maybe as DMB
 
 type HostDict = DM.Map W W
 
@@ -186,6 +187,31 @@ atom =
             Just v -> (WList [a, v])     
   <?> "atom"
 
+prettyPrint :: W -> String
+prettyPrint w = case w of
+                   WBool True -> "#True"
+                   WBool False -> "#False"
+                   WChar c -> ['~', c] 
+                   WNum n -> show n
+                   WList l -> build `DMB.fromMaybe` formatted
+                     where
+                        build :: String
+                        build = "(" ++ unwords (prettyPrint `map` l) ++ ")"
+                        formatted :: Maybe String
+                        formatted = (\x -> '#' : (show x)) `fmap` asString -- Better escaping than just 'show'
+                        asString :: Maybe String
+                        asString = foldr f (Just "") l
+                           where f :: W -> Maybe String -> Maybe String
+                                 f (WChar c) (Just state) = Just $ c:state
+                                 f _ _ = Nothing 
+                   WDict d -> "{" ++ unwords (format <$> asList) ++ "}"
+                     where asList = DM.toList d
+                           format :: (W, W) -> String
+                           format (k,v) = "[" ++ (prettyPrint k) ++ " " ++ (prettyPrint v) ++ "]"
+                   WSym s -> s -- TODO: escaping
+                   x -> show x -- TODO: something nice
+                   
+
 file_parser :: Parser [W]
 file_parser = do _ <- many blank_line
                  topLevels <- sepBy (line_parser 0) (many blank_line)
@@ -248,7 +274,7 @@ builtin_symbol = do _ <- char '#'
                     builtin_pairs reader_symbols
    where
       builtin_pairs :: [(String, W)] -> Parser W
-      builtin_pairs l = choice $ uncurry builtin_pair <$> l
+      builtin_pairs l = choice $ builtin_pair <$> l
       reader_symbols :: [(String, W)]
       reader_symbols =  [("True", WBool True)
                         ,("False", WBool False)
@@ -288,8 +314,8 @@ builtin_symbol = do _ <- char '#'
                         ,("dict-to-list", WDictToList)
                         ,("trace", WTrace)
                         ,("error", WError)]
-      builtin_pair :: String -> W -> Parser W
-      builtin_pair symbol wvalue = wvalue <$ try (string symbol)
+      builtin_pair :: (String, W) -> Parser W
+      builtin_pair (symbol, wvalue) = wvalue <$ try (string symbol)
 
 literal_string :: Parser W
 literal_string = do _ <- char '"'
@@ -346,4 +372,4 @@ main =
             Left e  -> do putStrLn "Error parsing input:"
                           print e
             Right a -> do r <- eval a DM.empty
-                          putStrLn (show r)
+                          putStrLn $ prettyPrint r
