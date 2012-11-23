@@ -8,6 +8,8 @@ import           Text.ParserCombinators.Parsec
 import qualified Text.ParserCombinators.Parsec.Char as PC
 import qualified Data.Map as DM
 import qualified Data.Maybe as DMB
+import qualified Data.List as DL
+import qualified Control.Exception as CE
 
 type HostDict = DM.Map W W
 
@@ -33,7 +35,6 @@ data W =
  
 data BuiltinType = BoolType | CharType | DictType | FuncType | ListType | NumType | SymType | TypeType
   deriving (Show, Ord, Eq)
-
 
 eval :: W -> HostDict -> IO W
 
@@ -186,6 +187,30 @@ atom =
             Nothing -> a
             Just v -> (WList [a, v])     
   <?> "atom"
+
+
+data ParseTrie = ParseChoice (DM.Map Char ParseTrie)
+               | ParseValue W
+
+buildParser :: ParseTrie -> Parser W
+buildParser (ParseValue w) = return w
+buildParser (ParseChoice m) = foldl1 (<|>) (convert `map` (DM.toList m)) -- this can probably be written much more elegantly
+   where
+      convert :: (Char, ParseTrie) -> Parser W
+      convert (c, t) = char c *> (buildParser t)
+
+buildTrie :: [(String, W)] -> ParseTrie
+buildTrie raw = error "lol"
+   where
+      process :: (String, W) -> (Maybe Char, (String, W))
+      process ("", w) = (Nothing, ("", w))
+      process (x:xs, w) = (Just x, (xs, w))
+      s1 = process `map` raw
+      s2 = (\x -> (\ y -> [y]) `fmap` x) `map` s1
+      s3 = DM.fromListWith (++) s2 
+      --compress :: [(Maybe Char, String, W)] -> (Maybe Char, [String
+     -- compress foo = DM.fromListWith (++)
+         
 
 format :: W -> String
 format w = case w of
