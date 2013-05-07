@@ -7,8 +7,7 @@ Wisp is a whitespace lisp. It is designed to be extremely powerful and flexible,
   * [First-class combinators](https://secure.wikimedia.org/wikipedia/en/wiki/Fexpr)
   * Static Scoping with forward references (like you'd expect from a modern language)
   * Purely functional (or close to it)
-  * Compile to efficient javascript
-  * Based on persistent vectors and maps (not linked-lists like most lisps)
+  * Compile to efficient javascript and llvm
 
 Status
 ======
@@ -41,6 +40,10 @@ There's a launcher script `./scala/wisp <file.wisp>`, or a self-contained jar at
 ```
 usage: wisp file-to-interpret.wisp
 
+Haskell
+=======
+
+There's an initial haskell version, which is ridiciliously fast (x100 faster than scala). While it'd be great if this was maintained, at the moment the priority is on the bootstrap and scala version.
 
 Documentation
 ====
