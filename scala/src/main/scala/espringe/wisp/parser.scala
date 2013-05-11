@@ -1,5 +1,6 @@
 package espringe.wisp
 
+
 import scala.util.parsing.combinator._
 import scala.util.parsing.input.CharSequenceReader
 import scala.collection.immutable.HashMap
@@ -35,35 +36,35 @@ object Parser extends Parsers {
     positioned(rep(blankLine) ~> repsep(lineParser(0), rep1(blankLine)) ~< rep(blankLine) ^^ (x => new WList(x.toStream) with Positional))
   }
 
-  private def lineParser(depth: Int): Parser[W with Positional] =
+  private def lineParser(depth: Int): Parser[W] =
     repN(depth, '\t') ~>
-      positioned(
+      (
         rep1sep(atomParser, singleSpace) ~
           rep(rep1(blankLine) ~> lineParser(depth + 1)) ^^ (x => stitch(x._1, x._2)))
 
-  private def stitch(a: Seq[W with Positional], b: Seq[W with Positional]) = {
+  private def stitch(a: Seq[W], b: Seq[W]) = {
     assert(a.length >= 1)
     if (a.length == 1 && b.length == 0)
       a.head
     else
-      new WList(a.toStream ++ b.toStream) with Positional
+      WList(a.toStream ++ b.toStream)
   }
 
   private def comment = ';' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
 
-  private def atomParser: Parser[W with Positional] =
-    positioned((numParser | charParser | listParser | literalStringParser | literalVectParser | symbolParser | literalDictParser | builtInSymbolParser) ~ opt('.' ~> atomParser) ^^
-      (x => if (x._2.isDefined) new WList(Stream(x._1, x._2.get)) with Positional else x._1))
+  private def atomParser: Parser[W] =
+    ((numParser | charParser | listParser | literalStringParser | literalVectParser | symbolParser | literalDictParser | builtInSymbolParser) ~ opt('.' ~> atomParser) ^^
+      (x => if (x._2.isDefined) WList(Stream(x._1, x._2.get)) else x._1))
 
   private def charParser =
-    positioned('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => new WChar(x) with Positional))
+    ('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => new WChar(x) with Positional))
 
   private def listParser =
-    positioned('(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (x => new WList(x.toStream) with Positional))
+    ('(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (x => new WList(x.toStream) with Positional))
 
   private def literalVectParser = {
-    positioned('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ { x =>
+    ('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ { x =>
       val mk = new ListMake {}
       new WList(mk #:: (x.toStream: Stream[W])) with Positional
     })
@@ -72,7 +73,7 @@ object Parser extends Parsers {
   // {key value, key value, key value} 
   private def literalDictParser = positioned('{' ~> opt(singleSpace) ~> repsep(dictPairParser, ',' ~ singleSpace) ~< opt(singleSpace) <~ '}' ^^
     { x =>
-      val dm = new DictMake {}
+      val dm = DictMake()
       val stream: Stream[W] = x.toStream
       new WList(dm #:: stream) with Positional
     })
@@ -121,51 +122,10 @@ object Parser extends Parsers {
   private def singleSpace = elem(' ')
 
   // get around annoying precedent rule of <~
-  import language.implicitConversions
-  implicit private def toUnannoying[T](p: Parser[T]): UnannoyingParser[T] = new UnannoyingParser(p)
-  private class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
+  implicit class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
 
-  private def bm(s: String, exp: => W with Positional): Parser[W with Positional] =
-    acceptSeq(s) ^^ (_ => exp)
 
-  private def builtInSymbolParser = '#' ~> (
-    bm("True", new Bool(true) with Positional) |
-    bm("False", new Bool(false) with Positional) |
-    bm("eval", new Eval with Positional) |
-    bm("if", new If with Positional) |
-    bm("quote", new Quote with Positional) |
-    bm("sequence", new Sequence with Positional) |
-    bm("parse", new Parse with Positional) |
-    bm("read-file", new ReadFile with Positional) |
-    bm("vau", new Vau with Positional) |
-    bm("type-eq", new TypeEq with Positional) |
-    bm("type-of", new TypeOf with Positional) |
-    bm("bool-not", new BoolNot with Positional) |
-    bm("bool-eq", new BoolEq with Positional) |
-    bm("num-add", new NumAdd with Positional) |
-    bm("num-div", new NumDiv with Positional) |
-    bm("num-gt", new NumGT with Positional) |
-    bm("num-gte", new NumGTE with Positional) |
-    bm("num-eq", new NumEq with Positional) |
-    bm("num-lt", new NumLT with Positional) |
-    bm("num-lte", new NumLTE with Positional) |
-    bm("num-mult", new NumMult with Positional) |
-    bm("num-sub", new NumSub with Positional) |
-    bm("num-to-char-list", new NumToCharList with Positional) |
-    bm("sym-eq", new SymEq with Positional) |
-    bm("sym-to-char-list", new SymToCharList with Positional) |
-    bm("list-cons", new ListCons with Positional) |
-    bm("list-head", new ListHead with Positional) |
-    bm("list-empty?", new ListIsEmpty with Positional) |
-    bm("list-make", new ListMake with Positional) |
-    bm("list-tail", new ListTail with Positional) |
-    bm("dict-contains", new DictContains with Positional) |
-    bm("dict-get", new DictGet with Positional) |
-    bm("dict-insert", new DictInsert with Positional) |
-    bm("dict-make", new DictMake with Positional) |
-    bm("dict-remove", new DictRemove with Positional) |
-    bm("dict-size", new DictSize with Positional) |
-    bm("dict-to-list", new DictToList with Positional) |
-    bm("trace", new Trace with Positional) |
-    bm("error", new WError with Positional))
+  private def builtInSymbolParser: Parser[W] = '#' ^^ ???
 }
+
+

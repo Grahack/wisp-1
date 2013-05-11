@@ -6,7 +6,15 @@ object Interpretter {
 
   def apply(form: W): W = eval(new HashMap(), form)
 
-  def eval(e: HashMap[W, W], form: W): W =
+  def eval(e: Dict, form: W): W = {
+
+    object BoolEval {
+      def unapply(value: W) = value.asBool
+    }
+    object DictEval {
+      def unapply(value: W) = value.asDict
+    }
+
     form match {
 
       case sym: Sym => {
@@ -15,37 +23,40 @@ object Interpretter {
       }
       case fnCall: WList =>
         require(fnCall.value.nonEmpty, "Can't evaluate an empty list")
-        val fn #:: rawArgs = fnCall.value
+        val fn #:: rawArgs = fnCall.value // TODO: properly...
 
         eval(e, fn) match {
           // in order to tail call if/eval, can't just dynamic-dispatch out
 
-          case VauRun(capEnv, argS, envS, capCode) =>
-            eval(capEnv +
-              (argS -> new WList(rawArgs) with DerivedFrom { def from = fnCall }) +
-              (envS -> new Dict(e) with DerivedFrom { def from = fnCall }), capCode)
+          case UDF(capEnv, argS, envS, capCode) =>
+            require(rawArgs.isEmpty)
+            eval(capEnv + (argS -> WList(rawArgs)) + (envS -> WDict(e)), capCode)
+          case If() =>
+            val Stream(BoolEval(cond), trueCase, falseCase) = rawArgs
+            eval(e, if (cond) trueCase else falseCase)
+          case Eval() =>
+            val Stream(DictEval(ue), uform) = rawArgs
+            eval(ue, eval(e, uform))
 
-          case _: If => {
-            val Stream(cond, trueCase, falseCase) = rawArgs
-            if (eval(e, cond).hostBoolean)
-              eval(e, trueCase)
-            else
-              eval(e, falseCase)
-          }
-
-          case _: Eval => {
-            val Stream(de, dform) = rawArgs
-            eval(eval(e, de).asInstanceOf[Dict].value, eval(e, dform))
-          }
+          case DictMake() => ???
+          case ListMake() => ???
+          case Parse() => ???
+          case Quote() => ???
+          case ReadFile() => ???
+          case Vau() => ???
           
-          case _: Sequence => {
-            val Stream(a, b) = rawArgs
-            eval(e, a)
-            eval(e, b)
-          }
+          
+          
+          case WChar(x) => sys.error(s"Cannot evaluate a Char. $x in $fnCall")
+          case WDict(x) => sys.error(s"Cannot evalute a Dict. $x in $fnCall")
+          case WList(x) => sys.error(s"Cannot evalute a List? $x in $fnCall")
+          case Sym(x) => sys.error(s"Cannot evaluate a Symbol? $x in $fnCall")
+          case WType(x) => sys.error(s"Cannot evalute a Type. $x in $fnCall")
+          case Bool(x) => sys.error(s"Cannot evalute a Boolean. $x in $fnCall")
+          case Num(x) => sys.error(s"Cannot evaluate a Num. $x in $fnCall")
 
-          case wf => wf.execute(fnCall, e)
         }
       case x => x
     }
+  }
 }

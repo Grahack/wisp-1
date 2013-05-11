@@ -3,78 +3,37 @@ package espringe.wisp
 import scala.collection.immutable.HashMap
 import scala.util.parsing.input.Positional
 
-trait W {
-  def getEnv: HashMap[W, W] = err("getEnv")
+sealed trait W {
+  
+  def deparse: String
+  
+  
+  def asBool: Option[Boolean] = None
+  def asDict: Option[Dict] = None
 
-  def hostBoolean: Boolean = err("hostBool")
-  def hostChar: Char = err("hostChar")
-  def hostHashMap: HashMap[W, W] = err("hostDict")
-  def hostStream: Stream[W] = err("hostList")
-  def hostInt: Int = err("hostNum")
-  def hostSym: Symbol = err("hostSym")
-  def hostType: WTypes.WType = err("hostType")
-  def hostVect: IndexedSeq[W] = err("hostVect")
-  def hostString: String = err("hostString")
-
-  def execute(fn: WList, env: HashMap[W, W]): W = err("execute")
-
-  protected def err(op: String) = sys.error("Operation " + op + " not supported on: " + this)
-
-  override def equals(o: Any): Boolean = sys.error("Not implemented")
-
-  override def hashCode: Int = toString.hashCode()
+  override def hashCode: Int = ???
+  override def toString = deparse
 }
 
-class Bool(val value: Boolean) extends W {
-  override def toString = if (value) "True" else "False"
-  override def hostBoolean = value
-  override def equals(o: Any) = o match {
-    case wb: Bool => value == wb.value
-    case b: Boolean => value == b
-    case _ => false
-  }
-  override def hashCode = value.hashCode()
+case class Bool(value: Boolean) extends W {
+  override def deparse = if (value) "True" else "False"
 }
 
-class WChar(val value: Char) extends W {
-  override def toString = "~" + value
-  override def hostChar = value
-  override def equals(o: Any) = o match {
-    case wc: WChar => value == wc.value
-    case c: Char => value == c
-    case _ => false
-  }
-  override def hashCode = value.hashCode()
+case class WChar(value: Char) extends W {
+  override def deparse = "~" + value
 }
 
-class Dict(val value: HashMap[W, W]) extends W {
-  override def toString =
+case class WDict(value: Dict) extends W {
+  override def deparse =
     "{" + value.toList.map(x => (x._1.toString + " " + x._2.toString)).mkString(", ") + "}"
-  override def hostHashMap = value
-  override def equals(o: Any) = o match {
-    case d: Dict => value == d.value
-    case i: HashMap[_, _] => value == i
-    case _ => false
-  }
-  override def hashCode = value.hashCode()
 }
 
-class WList(val value: Stream[W]) extends W {
-  override def hostStream = value
-  override def equals(o: Any) = o match {
-    case l: WList => value == l.value
-    case s: Seq[_] => value == s
-    case _ => false
-  }
+case class WList(value: Stream[W]) extends W {
 
-  def evaledArgs(e: HashMap[W, W]) = value.tail.map(Interpretter.eval(e, _))
-
-  override def toString = asString.map('\'' + _ + '\'')
+  override def deparse = asString.map(x => s"'$x'")
     .getOrElse("(" + value.map(_.toString).mkString(" ") + ")")
 
   override def hashCode = 0
-
-  override def hostString = asString.get
 
   private def asString: Option[String] = {
     val sb = StringBuilder.newBuilder
@@ -90,131 +49,56 @@ class WList(val value: Stream[W]) extends W {
   }
 }
 
-class Num(val value: Int) extends W {
-  override def toString = value.toString()
-  override def hostInt = value
-  override def equals(o: Any) = o match {
-    case n: Num => value == n.value
-    case i: Int => value == i
-    case _ => false
-  }
-  override def hashCode = value.hashCode()
+case class Num(value: Long) extends W {
+  override def deparse = value.toString
 }
 
-// It's probably more efficient to implement this as a trait, rather than
-// boxing a symbol. TODO: investiage
-class Sym(val value: Symbol) extends W {
-  override def toString = value.name
-  override def hostSym = value
-  override def equals(o: Any) =
-    o match {
-      case as: Sym => value == as.value
-      case s: Symbol => value == s
-      case _ => false
-    }
-  override def hashCode = value.hashCode()
+
+case class Sym(value: Symbol) extends W {
+  override def deparse = value.name
 }
 
-// Pretty much what you'd expect: Takes three arguments: cond trueCase falseCase
-// only evalutes trueCase if it needs to, only evalutes falseCase if it needs to
-trait If extends W {
-  override def toString = "If"
-  // implementation in Interpretter, for tail-calls
+case class If() extends W  {
+  override def deparse = "#if"
 }
 
-// Takes two arguments, the form and the environment. Then evaluates the form using
-// the environment. Remember this function is strict, so the arguments are "double"
-// evaluated
-trait Eval extends W {
-  override def toString = "Eval"
-  // implementation in Interpretter, for tail-calls
+case class Eval() extends W {
+  override def deparse = "#eval"
 }
 
-trait ReadFile extends W {
-  override def toString = "ReadFile"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(file) = fn.evaledArgs(env)
-
-    new WList(
-      scala.io.Source.fromFile(file.hostString).toStream
-        .map(new WChar(_) with DerivedFrom { def from = fn })) with DerivedFrom { def from = fn }
-  }
+case class ReadFile() extends W {
+  override def deparse = "#read"
 }
 
-trait Parse extends W {
-  override def toString = "Parse"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(cl) = fn.evaledArgs(env)
-    val charList = cl.asInstanceOf[WList]
-    Parser(charList.hostString)
-  }
+case class Parse() extends W {
+  override def deparse = "#parse"
 }
 
-trait Vau extends W {
-  override def toString = "Vau"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(aS, eS, code) = fn.evaledArgs(env)
-
-    // not entirely sure special casing _ is overly nice, but it seems to work well in practice
-    require(aS.isInstanceOf[Sym], "Vau expects that the arg is a symbol, got: " + aS)
-
-    val argSym = aS.asInstanceOf[Sym]
-
-    require(argSym.value == Symbol("_") || !env.contains(argSym), "The environment already contains arg symbol: " + argSym)
-
-    require(eS.isInstanceOf[Sym], "Vau expects that the env is a symbol, got: " + eS)
-
-    val envSym = eS.asInstanceOf[Sym]
-
-    require(envSym.value == Symbol("_") || !env.contains(envSym), "The environment already contains env symbol: " + envSym)
-
-    require(envSym.value == Symbol("_") || argSym != envSym, "ArgSymbol and EnvSymbol: " + argSym + " must not be the same")
-
-    new VauRun(env, argSym, envSym, code)
-  }
+case class Vau() extends W {
+  override def deparse = "#vau"
 }
 
-case class VauRun(capEnv: HashMap[W, W], arg: Sym, env: Sym, capCode: W) extends W {
-  override def toString = "$UDF$"
-  // implementation in Interpretter, for tail-calls
+
+case class UDF(capEnv: Dict, arg: Sym, env: Sym, capCode: W) extends W {
+  override def deparse = "#???UDF???"
 }
 
-object WTypes extends Enumeration {
-  type WType = Value
+object Primitives extends Enumeration {
+  type Primitive = Value
   val TypeBool, TypeSym, TypeNum, TypeDict, TypeFunc, TypeList, TypeType = Value
 }
 
-class WType(val value: WTypes.WType) extends W {
-  override def toString = "{Type: " + value.toString + "}"
-  override def hostType = value
-  override def equals(o: Any) =
-    o match {
-      case at: WType => value == at.value
-      case t: WTypes.WType => value == t
-      case _ => false
-    }
-}
-
-trait DerivedFrom {
-  def from: W
+case class WType(value: Primitives.Primitive) extends W {
+  override def deparse = "{Type: " + value.toString + "}"
 }
 
 // The only non-strict builtin in wisp. Return the first argument unevaluated
-trait Quote extends W {
-  override def toString = "Quote"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    require(fn.value.length == 2, "Argument to quote must have exactly 1 argument")
-    fn.value(1)
-  }
-  override def equals(o: Any) = o.isInstanceOf[Quote]
+case class Quote() extends W {
+  override def deparse = "#quote"
 }
 
-trait Sequence extends W {
-  override def toString = "Sequence"
-  // impl in interpretter for tail-calls
-}
-
-trait TypeEq extends W {
+/*
+case class TypeEq() extends W {
   override def toString = "TypeEq"
   override def execute(fn: WList, env: HashMap[W, W]) = {
     val Stream(a, b) = fn.evaledArgs(env)
@@ -373,13 +257,12 @@ trait ListIsEmpty extends W {
   override def equals(o: Any) = o.isInstanceOf[ListIsEmpty]
 }
 
-trait ListMake extends W {
-  override def toString = "ListMake"
-  override def execute(fn: WList, env: HashMap[W, W]) =
-    new WList(fn.evaledArgs(env)) with DerivedFrom { def from = fn }
-  override def equals(o: Any) = o.isInstanceOf[ListMake]
+ */
+case class ListMake() extends W {
+  override def deparse = "#list-make"
 }
 
+/*
 trait ListTail extends W {
   override def toString = "ListTail"
   override def execute(fn: WList, env: HashMap[W, W]) = {
@@ -440,22 +323,13 @@ trait DictToList extends W {
     new WList(dict.hostHashMap.toStream.map(x => new WList(Stream(x._1, x._2)))) with DerivedFrom { def from = fn }
   }
 }
+*/
 
-trait DictMake extends W {
-  override def toString = "DictMake"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val pairs = fn.evaledArgs(env).map(x => {
-      require(x.isInstanceOf[WList])
-      val l = x.asInstanceOf[WList].value
-      require(l.length == 2)
-      (l(0), l(1))
-    })
-
-    new Dict(HashMap(pairs.toSeq: _*)) with DerivedFrom { def from = fn }
-  }
-  override def equals(o: Any) = o.isInstanceOf[DictMake]
+case class DictMake() extends W {
+  override def deparse = "#dict-make"
 }
 
+/*
 trait Trace extends W {
   override def toString = "Trace"
   override def execute(fn: WList, env: HashMap[W, W]) = {
@@ -472,3 +346,6 @@ trait WError extends W {
   override def execute(fn: WList, env: HashMap[W, W]) =
     sys.error("Code Error." + fn.evaledArgs(env).mkString(", ")) // TODO: better info
 }
+* 
+*/
+
