@@ -3,35 +3,58 @@ package espringe.wisp
 import scala.collection.immutable.HashMap
 import scala.util.parsing.input.Positional
 
-sealed trait W {
-  
+sealed trait SourceInfo {
+  def print: String
+}
+object UnknownSource extends SourceInfo {
+  def print = "Source: Unknown"
+}
+class LexicalSource(file: String, pos: Long) extends SourceInfo {
+  def print = s"Source: $file position $pos"
+}
+class ComputedSource(from: W) extends SourceInfo {
+  def print = "Computed from: \n\t" + from.toString.replaceAll("\n", "\n\t")
+}
+
+
+sealed abstract class W(source: SourceInfo) {
+
   def deparse: String
-  
-  
+  def typeOf: Primitives.Primitive
+
   def asBool: Option[Boolean] = None
+  def asChar: Option[Char] = None
   def asDict: Option[Dict] = None
+  def asList: Option[Stream[W]] = None
+  def asSym: Option[Sym] = None
+  def asType: Option[Primitives.Primitive] = None
+  def asStream: Option[Stream[W]] = None
 
   override def hashCode: Int = ???
   override def toString = deparse
 }
 
-case class Bool(value: Boolean) extends W {
+case class Bool(value: Boolean, source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = if (value) "True" else "False"
+  override def typeOf = Primitives.TypeBool
 }
 
-case class WChar(value: Char) extends W {
+case class WChar(value: Char, source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "~" + value
+  override def typeOf = Primitives.TypeChar
 }
 
-case class WDict(value: Dict) extends W {
+case class WDict(value: Dict, source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse =
     "{" + value.toList.map(x => (x._1.toString + " " + x._2.toString)).mkString(", ") + "}"
+  override def typeOf = Primitives.TypeDict
 }
 
-case class WList(value: Stream[W]) extends W {
+case class WList(value: Stream[W], source: SourceInfo = UnknownSource) extends W(source) {
 
   override def deparse = asString.map(x => s"'$x'")
     .getOrElse("(" + value.map(_.toString).mkString(" ") + ")")
+  override def typeOf = Primitives.TypeList
 
   override def hashCode = 0
 
@@ -49,88 +72,84 @@ case class WList(value: Stream[W]) extends W {
   }
 }
 
-case class Num(value: Long) extends W {
+case class Num(value: Long, source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = value.toString
+  override def typeOf = Primitives.TypeNum
 }
 
-
-case class Sym(value: Symbol) extends W {
+case class Sym(value: Symbol, source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = value.name
+  override def typeOf = Primitives.TypeSym
 }
 
-case class If() extends W  {
+class If(source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#if"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-case class Eval() extends W {
+class Eval(source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#eval"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-case class ReadFile() extends W {
+class ReadFile(source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#read"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-case class Parse() extends W {
+class Parse(source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#parse"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-case class Vau() extends W {
+class Vau(source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#vau"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-
-case class UDF(capEnv: Dict, arg: Sym, env: Sym, capCode: W) extends W {
+case class UDF(capEnv: Dict, arg: Sym, env: Sym, capCode: W, source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#???UDF???"
+  override def typeOf = Primitives.TypeFunc
 }
 
 object Primitives extends Enumeration {
   type Primitive = Value
-  val TypeBool, TypeSym, TypeNum, TypeDict, TypeFunc, TypeList, TypeType = Value
+  val TypeBool, TypeChar, TypeSym, TypeNum, TypeDict, TypeBuiltIn, TypeFunc, TypeList, TypeType = Value
 }
 
-case class WType(value: Primitives.Primitive) extends W {
+case class WType(value: Primitives.Primitive, source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "{Type: " + value.toString + "}"
+  override def typeOf = Primitives.TypeType
 }
 
-// The only non-strict builtin in wisp. Return the first argument unevaluated
-case class Quote() extends W {
-  override def deparse = "#quote"
+class Deref(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#deref"
+  override def typeOf = Primitives.TypeBuiltIn
+
 }
 
-/*
-case class TypeEq() extends W {
-  override def toString = "TypeEq"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostType == b.hostType) with DerivedFrom { def from = fn }
-  }
+class TypeEq(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#type-eq"
+  override def typeOf = Primitives.TypeBuiltIn
+
 }
 
-trait TypeOf extends W {
-  override def toString = "TypeOf"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a) = fn.evaledArgs(env)
-    new WType(a.hostType) with DerivedFrom { def from = fn } // TODO: this is totally wrong
-  }
+class TypeOf(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#type-of"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 // boolean
-trait BoolNot extends W {
-  override def toString = "BoolNot"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a) = fn.evaledArgs(env)
-    new Bool(!a.hostBoolean) with DerivedFrom { def from = fn }
-  }
+class BoolNot(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#bool-not"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-trait BoolEq extends W {
-  override def toString = "BoolEq"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostBoolean == b.hostBoolean) with DerivedFrom { def from = fn }
-  }
+class BoolEq(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#bool-eq"
+  override def typeOf = Primitives.TypeBuiltIn
 }
-
+/*
 // num
 trait NumAdd extends W {
   override def toString = "NumAdd"
@@ -258,8 +277,9 @@ trait ListIsEmpty extends W {
 }
 
  */
-case class ListMake() extends W {
+class ListMake(source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#list-make"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 /*
@@ -325,8 +345,9 @@ trait DictToList extends W {
 }
 */
 
-case class DictMake() extends W {
+class DictMake(source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#dict-make"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 /*
