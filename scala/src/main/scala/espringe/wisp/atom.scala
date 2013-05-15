@@ -26,6 +26,7 @@ sealed abstract class W(source: SourceInfo) {
   def asChar: Option[Char] = None
   def asDict: Option[Dict] = None
   def asList: Option[Stream[W]] = None
+  def asNum: Option[Num] = None
   def asSym: Option[Sym] = None
   def asType: Option[Primitives.Primitive] = None
   def asStream: Option[Stream[W]] = None
@@ -149,88 +150,58 @@ class BoolEq(source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#bool-eq"
   override def typeOf = Primitives.TypeBuiltIn
 }
-/*
+
 // num
 trait NumAdd extends W {
-  override def toString = "NumAdd"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Num(a.hostInt + b.hostInt) with DerivedFrom { def from = fn }
-  }
+  override def deparse = "#num-add"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 trait NumDiv extends W {
-  override def toString = "NumDiv"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Num(a.hostInt / b.hostInt) with DerivedFrom { def from = fn }
-  }
+  override def deparse = "#num-div"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 trait NumGT extends W {
-  override def toString = "NumGT"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostInt > b.hostInt) with DerivedFrom { def from = fn }
-  }
+  override def toString = "#num-gt"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 trait NumGTE extends W {
-  override def toString = "NumGTE"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostInt >= b.hostInt) with DerivedFrom { def from = fn }
-  }
+  override def toString = "#num-gte"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 trait NumEq extends W {
-  override def toString = "NumEq"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostInt == b.hostInt) with DerivedFrom { def from = fn }
-  }
+  override def toString = "#num-eq"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 trait NumLT extends W {
-  override def toString = "NumLT"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostInt < b.hostInt) with DerivedFrom { def from = fn }
-  }
+  override def toString = "#num-lt"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 trait NumLTE extends W {
-  override def toString = "NumLTE"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostInt <= b.hostInt) with DerivedFrom { def from = fn }
-  }
+  override def toString = "#num-lte"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 trait NumMult extends W {
-  override def toString = "NumMult"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Num(a.hostInt * b.hostInt) with DerivedFrom { def from = fn }
-  }
+  override def toString = "#num-mult"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 trait NumSub extends W {
-  override def toString = "NumSub"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Num(a.hostInt - b.hostInt) with DerivedFrom { def from = fn }
-  }
+  override def toString = "#num-sub"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
 trait NumToCharList extends W {
-  override def toString = "NumToCharList"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a) = fn.evaledArgs(env)
-    new WList(a.hostInt.toString.map(x => new WChar(x)).toStream) with DerivedFrom { def from = fn }
-  }
+  override def toString = "#num-to-char-list"
+  override def typeOf = Primitives.TypeBuiltIn
 }
-
+/*
 // sym stuff
 
 trait SymEq extends W {

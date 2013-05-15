@@ -17,6 +17,9 @@ object Interpretter {
     object DictEval {
       def unapply(value: W) = eval(e, value).asDict
     }
+    object NumEval {
+      def unapply(value: W) = eval(e, value).asNum
+    }
     object SymEval {
       def unapply(value: W) = eval(e, value).asSym
     }
@@ -33,7 +36,7 @@ object Interpretter {
     form match {
 
       case fnCall @ WList(WEval(fn) #:: rawArgs, _) =>
-        
+
         def from = new ComputedSource(fnCall)
 
         fn match { // in order to tail call if/eval, can't just dynamic-dispatch out
@@ -47,7 +50,7 @@ object Interpretter {
           case _: Eval =>
             val Stream(DictEval(ue), uform) = rawArgs
             eval(ue, eval(e, uform))
-            
+
           case _: BoolEq =>
             val Stream(BoolEval(a), BoolEval(b)) = rawArgs
             Bool(a == b, from)
@@ -66,7 +69,7 @@ object Interpretter {
           case _: ReadFile => {
             val Stream(StreamEval(fns)) = rawArgs
             val fileName = fns.map { c => c.asChar.get }.mkString
-            WList( io.Source.fromFile(fileName).toStream.map(WChar(_)), from)
+            WList(io.Source.fromFile(fileName).toStream.map(WChar(_)), from)
           }
           case _: TypeEq => {
             val Stream(TypeEval(a), TypeEval(b)) = rawArgs
@@ -85,6 +88,47 @@ object Interpretter {
             require(aS == Symbol("_") || aS != eS, s"Arg symbol $aS is the same as env symbol in $fnCall")
 
             UDF(e, aS, eS, code, from)
+          }
+          case _: NumAdd => {
+            val Stream(NumEval(a), NumEval(b)) = rawArgs
+            Num(a.value + b.value)
+          }
+          case _: NumDiv => {
+            val Stream(NumEval(a), NumEval(b)) = rawArgs
+            require(b.value != 0, s"Divisor was zero in $fn")
+            Num(a.value / b.value)
+          }
+          case _: NumEq => {
+            val Stream(NumEval(a), NumEval(b)) = rawArgs
+            Bool(a.value == b.value)
+          }
+          case _: NumGT => {
+            val Stream(NumEval(a), NumEval(b)) = rawArgs
+            Bool(a.value > b.value)
+          }
+          case _: NumGTE => {
+            val Stream(NumEval(a), NumEval(b)) = rawArgs
+            Bool(a.value >= b.value)
+          }
+          case _: NumLT => {
+            val Stream(NumEval(a), NumEval(b)) = rawArgs
+            Bool(a.value < b.value)
+          }
+          case _: NumLTE => {
+            val Stream(NumEval(a), NumEval(b)) = rawArgs
+            Bool(a.value <= b.value)
+          }
+          case _: NumMult => {
+            val Stream(NumEval(a), NumEval(b)) = rawArgs
+            Num(a.value * b.value)
+          }
+          case _: NumSub => {
+            val Stream(NumEval(a), NumEval(b)) = rawArgs
+            Num(a.value - b.value)
+          }
+          case _: NumToCharList => {
+            val Stream(NumEval(a)) = rawArgs
+            WList(a.toString.map(WChar(_)).toStream)
           }
 
           case x: WChar => sys.error(s"Cannot evaluate a Char. $x in $fnCall")
