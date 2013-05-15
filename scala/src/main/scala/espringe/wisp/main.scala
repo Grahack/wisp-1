@@ -15,7 +15,7 @@ object Main {
       .flatMap { x =>
         val (forms, time) = timeFunc(Parser(x))
         println("Parsing took: " + time)
-        forms.value
+        forms
       }
       .foreach { x =>
         val (res, time) = timeFunc(Interpretter(x))

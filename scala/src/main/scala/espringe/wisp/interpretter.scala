@@ -93,7 +93,7 @@ object Interpretter {
           case _: Parse =>
             val Stream(StreamEval(letters)) = rawArgs
             val asString = letters.map { _.asChar.get }.mkString // ewwwwwwwww
-            Parser(asString) // TODO: List[W] 
+            WList(Parser(asString).toStream)
           case _: Deref =>
             val Stream(SymEval(s)) = rawArgs
             e(s) // TODO: add from

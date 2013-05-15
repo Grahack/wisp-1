@@ -9,8 +9,9 @@ sealed trait SourceInfo {
 object UnknownSource extends SourceInfo {
   def print = "Source: Unknown"
 }
-class LexicalSource(file: String, pos: Long) extends SourceInfo {
-  def print = s"Source: $file position $pos"
+
+case class LexicalSource(file: String, column: Long, line: Long) extends SourceInfo {
+  def print = s"Source: $file column $column line $line"
 }
 class ComputedSource(from: W) extends SourceInfo {
   def print = "Computed from: \n\t" + from.toString.replaceAll("\n", "\n\t")
@@ -35,7 +36,7 @@ sealed abstract class W(source: SourceInfo) {
 }
 
 case class Bool(value: Boolean, source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = if (value) "True" else "False"
+  override def deparse = if (value) "#true" else "#false"
   override def typeOf = Primitives.TypeBool
 }
 
@@ -52,6 +53,8 @@ case class WDict(value: Dict, source: SourceInfo = UnknownSource) extends W(sour
 
 case class WList(value: Stream[W], source: SourceInfo = UnknownSource) extends W(source) {
 
+  override def equals(o: Any) = o.isInstanceOf[WList] && value == o.asInstanceOf[WList].value
+  
   override def deparse = asString.map(x => s"'$x'")
     .getOrElse("(" + value.map(_.toString).mkString(" ") + ")")
   override def typeOf = Primitives.TypeList
@@ -168,6 +171,7 @@ class ListIsEmpty(source: SourceInfo = UnknownSource) extends W(source) {
 }
 
 class ListMake(source: SourceInfo = UnknownSource) extends W(source) {
+  override def equals(o: Any) = o.isInstanceOf[ListMake]
   override def deparse = "#list-make"
   override def typeOf = Primitives.TypeBuiltIn
 }
@@ -261,12 +265,12 @@ class DictRemove(source: SourceInfo = UnknownSource) extends W(source) {
 }
 
 class DictSize(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "DictSize"
+  override def deparse = "#dict-size"
   override def typeOf = Primitives.TypeBuiltIn
 }
 
 class DictToList(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "DictToList"
+  override def deparse = "#dict-to-list"
   override def typeOf = Primitives.TypeBuiltIn
 }
 

@@ -3,6 +3,7 @@ package espringe.wisp
 import scala.util.parsing.combinator._
 import scala.util.parsing.input.CharSequenceReader
 import scala.collection.immutable.HashMap
+import scala.util.parsing.input.Positional
 
 import java.io._
 
@@ -10,11 +11,11 @@ object Parser extends Parsers {
 
   type Elem = Char
 
-  def apply(path: io.Source): WList =
+  def apply(path: io.Source): List[W] =
     run(new util.parsing.input.PagedSeqReader(
       collection.immutable.PagedSeq.fromSource(path)))
 
-  def apply(contents: CharSequence): WList = run(new util.parsing.input.CharSequenceReader(contents))
+  def apply(contents: CharSequence): List[W] = run(new util.parsing.input.CharSequenceReader(contents))
 
   def run(rdr: scala.util.parsing.input.Reader[Char]) =
     this.synchronized { // Parser combinators are unfortunately thread-unsafe?! (SI-4929)
@@ -30,8 +31,8 @@ object Parser extends Parsers {
       }
     }
 
-  private def fileParser: Parser[WList] = {
-    (rep(blankLine) ~> repsep(lineParser(0), rep1(blankLine)) ~< rep(blankLine) ^^ (x => new WList(x.toStream)))
+  private def fileParser: Parser[List[W]] = {
+    rep(blankLine) ~> repsep(lineParser(0), rep1(blankLine)) ~< rep(blankLine)
   }
 
   private def lineParser(depth: Int): Parser[W] =
@@ -63,8 +64,8 @@ object Parser extends Parsers {
 
   private def literalVectParser = {
     ('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ { x =>
-      val mk = new ListMake {}
-      new WList(mk #:: (x.toStream: Stream[W]))
+      val mk = new ListMake
+      WList(mk #:: (x.toStream: Stream[W]))
     })
   }
 
@@ -115,6 +116,57 @@ object Parser extends Parsers {
 
   private def charListToSymbol(letters: List[Char]) = Symbol(new String(letters.toArray))
 
+  private case class PositionalString(str: String) extends Positional
+
+  private def nonSpecialChar = acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for builtin symbol")
+
+  private def builtInSymbolParser: Parser[W] = positioned('#' ~> rep1(nonSpecialChar) ^^ (x => PositionalString(x.mkString))) ^^
+    { x =>
+
+      val p = LexicalSource("UnknownFile", x.pos.column, x.pos.line)
+
+      x.str match {
+        case "true" => new Bool(true, p)
+        case "false" => new Bool(false, p)
+        case "if" => new If(p)
+        case "eval" => new Eval(p)
+        case "read" => new ReadFile(p)
+        case "parse" => new Parse(p)
+        case "vau" => new Vau(p)
+        case "deref" => new Deref(p)
+        case "type-eq" => new TypeEq(p)
+        case "type-of" => new TypeOf(p)
+        case "bool-not" => new BoolNot(p)
+        case "bool-eq" => new BoolEq(p)
+        case "list-cons" => new ListCons(p)
+        case "list-head" => new ListHead(p)
+        case "list-empty?" => new ListIsEmpty(p)
+        case "list-make" => new ListMake(p)
+        case "list-tail" => new ListTail(p)
+        case "num-add" => new NumAdd(p)
+        case "num-div" => new NumDiv(p)
+        case "num-gt" => new NumGT(p)
+        case "num-gte" => new NumGTE(p)
+        case "num-eq" => new NumEq(p)
+        case "num-lt" => new NumLT(p)
+        case "num-lte" => new NumLTE(p)
+        case "num-mult" => new NumMult(p)
+        case "num-sub" => new NumSub(p)
+        case "num-to-char-list" => new NumToCharList(p)
+        case "sym-eq" => new SymEq(p)
+        case "sym-to-char-list" => new SymToCharList(p)
+        case "dict-contains" => new DictContains(p)
+        case "dict-get" => new DictGet(p)
+        case "dict-insert" => new DictInsert(p)
+        case "dict-size" => new DictSize(p)
+        case "dict-to-list" => new DictToList(p)
+        case "dict-make" => new DictMake(p)
+        case "trace" => new Trace(p)
+        case "error" => new WError(p)
+      }
+
+    }
+
   private def eol = elem('\n') // probably should support windows-endline, but meh
 
   private def singleSpace = elem(' ')
@@ -122,7 +174,6 @@ object Parser extends Parsers {
   // get around annoying precedent rule of <~
   implicit class UnannoyingParser[T](left: Parser[T]) { def ~<[V](right: => Parser[V]) = left <~ right }
 
-  private def builtInSymbolParser: Parser[W] = '#' ^^ ???
 }
 
 
