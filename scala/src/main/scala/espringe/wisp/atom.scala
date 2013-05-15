@@ -16,7 +16,6 @@ class ComputedSource(from: W) extends SourceInfo {
   def print = "Computed from: \n\t" + from.toString.replaceAll("\n", "\n\t")
 }
 
-
 sealed abstract class W(source: SourceInfo) {
 
   def deparse: String
@@ -151,193 +150,137 @@ class BoolEq(source: SourceInfo = UnknownSource) extends W(source) {
   override def typeOf = Primitives.TypeBuiltIn
 }
 
-// num
-trait NumAdd extends W {
-  override def deparse = "#num-add"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-trait NumDiv extends W {
-  override def deparse = "#num-div"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-trait NumGT extends W {
-  override def toString = "#num-gt"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-trait NumGTE extends W {
-  override def toString = "#num-gte"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-trait NumEq extends W {
-  override def toString = "#num-eq"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-trait NumLT extends W {
-  override def toString = "#num-lt"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-trait NumLTE extends W {
-  override def toString = "#num-lte"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-trait NumMult extends W {
-  override def toString = "#num-mult"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-trait NumSub extends W {
-  override def toString = "#num-sub"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-trait NumToCharList extends W {
-  override def toString = "#num-to-char-list"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-/*
-// sym stuff
-
-trait SymEq extends W {
-  override def toString = "SymEq"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(a, b) = fn.evaledArgs(env)
-    new Bool(a.hostSym == b.hostSym) with DerivedFrom { def from = fn }
-  }
-}
-
-trait SymToCharList extends W {
-  override def toString = "SymToCharList"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(list) = fn.evaledArgs(env)
-    new WList(list.hostSym.name.map(x => new WChar(x)).toStream) with DerivedFrom { def from = fn }
-  }
-}
-
 // list stuff
 
-trait ListCons extends W {
-  override def toString = "ListCons"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(list, value) = fn.evaledArgs(env)
-    new WList(value #:: list.hostStream) with DerivedFrom { def from = fn }
-  }
+class ListCons(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#list-cons"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-trait ListHead extends W {
-  override def toString = "ListHead"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(list) = fn.evaledArgs(env)
-    list.hostStream.head
-  }
+class ListHead(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#list-head"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-trait ListIsEmpty extends W {
-  override def toString = "ListIsEmpty"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(list) = fn.evaledArgs(env)
-    new Bool(list.hostStream.isEmpty) with DerivedFrom { def from = fn }
-  }
-  override def equals(o: Any) = o.isInstanceOf[ListIsEmpty]
+class ListIsEmpty(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#list-empty?"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
- */
 class ListMake(source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#list-make"
   override def typeOf = Primitives.TypeBuiltIn
 }
 
-/*
-trait ListTail extends W {
-  override def toString = "ListTail"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(list) = fn.evaledArgs(env)
-    new WList(list.hostStream.tail) with DerivedFrom { def from = fn }
-  }
-  override def equals(o: Any) = o.isInstanceOf[ListTail]
+class ListTail(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#list-tail"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-trait DictContains extends W {
-  override def toString = "DictContains"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(dict, key) = fn.evaledArgs(env)
-    new Bool(dict.hostHashMap.contains(key)) with DerivedFrom { def from = fn }
-  }
+// num
+class NumAdd(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#num-add"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-trait DictGet extends W {
-  override def toString = "DictGet"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(dict, key) = fn.evaledArgs(env)
-    dict.hostHashMap(key)
-  }
+class NumDiv(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#num-div"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-trait DictInsert extends W {
-  override def toString = "DictInsert"
-  override def execute(fn: WList, env: HashMap[W, W]): W = {
-    val Stream(dict: W, key: W, value: W) = fn.evaledArgs(env)
-    val d = dict.hostHashMap
-    require(!d.contains(key))
-    new Dict(d + (key -> value)) with DerivedFrom { def from = fn }
-  }
+class NumGT(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#num-gt"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-trait DictRemove extends W {
-  override def toString = "DictRemove"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(dict, key) = fn.evaledArgs(env)
-    val d = dict.hostHashMap
-    require(d.contains(key))
-    new Dict(d - key) with DerivedFrom { def from = fn }
-  }
+class NumGTE(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#num-gte"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-trait DictSize extends W {
-  override def toString = "DictSize"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(dict) = fn.evaledArgs(env)
-    new Num(dict.hostHashMap.size) with DerivedFrom { def from = fn }
-  }
+class NumEq(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#num-eq"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-trait DictToList extends W {
-  override def toString = "DictToList"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val Stream(dict) = fn.evaledArgs(env)
-    new WList(dict.hostHashMap.toStream.map(x => new WList(Stream(x._1, x._2)))) with DerivedFrom { def from = fn }
-  }
+class NumLT(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#num-lt"
+  override def typeOf = Primitives.TypeBuiltIn
 }
-*/
+
+class NumLTE(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#num-lte"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+class NumMult(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#num-mult"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+class NumSub(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#num-sub"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+class NumToCharList(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#num-to-char-list"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+// sym stuff
+
+class SymEq(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#sym-eq"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+class SymToCharList(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#sym-to-char-list"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+class DictContains(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#dict-contains"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+class DictGet(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#dict-get"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+class DictInsert(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#dict-insert"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+class DictRemove(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#dict-remove"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+class DictSize(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "DictSize"
+  override def typeOf = Primitives.TypeBuiltIn
+}
+
+class DictToList(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "DictToList"
+  override def typeOf = Primitives.TypeBuiltIn
+}
 
 class DictMake(source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#dict-make"
   override def typeOf = Primitives.TypeBuiltIn
 }
 
-/*
-trait Trace extends W {
-  override def toString = "Trace"
-  override def execute(fn: WList, env: HashMap[W, W]) = {
-    val args = fn.evaledArgs(env)
-    require(args.length >= 1)
-    println("Tracing: " + args.mkString(" "))
-
-    args.last
-  }
+class Trace(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#trace"
+  override def typeOf = Primitives.TypeBuiltIn
 }
 
-trait WError extends W {
-  override def toString = "Error"
-  override def execute(fn: WList, env: HashMap[W, W]) =
-    sys.error("Code Error." + fn.evaledArgs(env).mkString(", ")) // TODO: better info
+class WError(source: SourceInfo = UnknownSource) extends W(source) {
+  override def deparse = "#error"
+  override def typeOf = Primitives.TypeBuiltIn
 }
-* 
-*/
-

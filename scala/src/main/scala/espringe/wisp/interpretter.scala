@@ -20,6 +20,9 @@ object Interpretter {
     object NumEval {
       def unapply(value: W) = eval(e, value).asNum
     }
+    object ListEval {
+      def unapply(value: W) = eval(e, value).asList
+    }
     object SymEval {
       def unapply(value: W) = eval(e, value).asSym
     }
@@ -57,6 +60,34 @@ object Interpretter {
           case _: BoolNot =>
             val Stream(BoolEval(a), BoolEval(b)) = rawArgs
             Bool(a != b, from)
+          case _: DictContains => {
+            val Stream(DictEval(a), WEval(k)) = rawArgs
+            Bool(a.contains(k))
+          }
+          case _: DictGet => {
+            val Stream(DictEval(d), WEval(k)) = rawArgs
+
+            require(d.contains(k), s"Dictionary $d did not contain $k in $fnCall")
+
+            d(k)
+          }
+          case _: DictInsert => {
+            val Stream(DictEval(d), WEval(k), WEval(v)) = rawArgs
+            WDict(d + ((k, v)))
+          }
+          case _: DictRemove => {
+            val Stream(DictEval(d), WEval(k)) = rawArgs
+            require(d.contains(k), s"Dictionary $d must contain $k in order to remove it, in $fnCall")
+            WDict(d - k)
+          }
+          case _: DictToList => {
+            val Stream(DictEval(d)) = rawArgs
+            WList(d.toStream.map { case (k, v) => WList(Stream(k, v)) })
+          }
+          case _: DictSize => {
+            val Stream(DictEval(d)) = rawArgs
+            Num(d.size)
+          }
           case _: DictMake => WDict(rawArgs.foldLeft(Dict) { case (p, PairEval(kv)) => p + kv }, from)
           case _: ListMake => WList(rawArgs.map(eval(e, _)), from)
           case _: Parse =>
@@ -71,6 +102,14 @@ object Interpretter {
             val fileName = fns.map { c => c.asChar.get }.mkString
             WList(io.Source.fromFile(fileName).toStream.map(WChar(_)), from)
           }
+          case _: Trace => {
+            rawArgs.map(eval(e, _)).foldLeft(WList(Stream()): W) {
+              (p, n) =>
+                println(p)
+                n
+            }
+          }
+
           case _: TypeEq => {
             val Stream(TypeEval(a), TypeEval(b)) = rawArgs
             Bool(a == b, from)
@@ -88,6 +127,22 @@ object Interpretter {
             require(aS == Symbol("_") || aS != eS, s"Arg symbol $aS is the same as env symbol in $fnCall")
 
             UDF(e, aS, eS, code, from)
+          }
+          case _: ListCons => {
+            val Stream(ListEval(l), WEval(e)) = rawArgs
+            WList(e #:: l)
+          }
+          case _: ListHead => {
+            val Stream(ListEval(l)) = rawArgs
+            l.head
+          }
+          case _: ListIsEmpty => {
+            val Stream(ListEval(l)) = rawArgs
+            Bool(l.isEmpty)
+          }
+          case _: ListTail => {
+            val Stream(ListEval(l)) = rawArgs
+            WList(l.tail)
           }
           case _: NumAdd => {
             val Stream(NumEval(a), NumEval(b)) = rawArgs
@@ -128,7 +183,20 @@ object Interpretter {
           }
           case _: NumToCharList => {
             val Stream(NumEval(a)) = rawArgs
-            WList(a.toString.map(WChar(_)).toStream)
+            WList(a.toString.toStream.map(WChar(_)))
+          }
+
+          case _: SymEq => {
+            val Stream(SymEval(a), SymEval(b)) = rawArgs
+            Bool(a.value == b.value)
+          }
+          case _: SymToCharList => {
+            val Stream(SymEval(a)) = rawArgs
+            WList(a.value.name.toStream.map(WChar(_)))
+          }
+
+          case _: WError => {
+            sys.error(s"Fatal error, triggered by $fnCall evaled args: " + rawArgs.map(eval(e, _)).mkString(" "))
           }
 
           case x: WChar => sys.error(s"Cannot evaluate a Char. $x in $fnCall")
