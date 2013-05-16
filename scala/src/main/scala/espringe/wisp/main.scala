@@ -3,26 +3,29 @@ package espringe.wisp
 object Main {
 
   def main(args: Array[String]) {
+    require(args.size == 1, "Expected a single argument, the file to run")
 
-    if (args.isEmpty)
-      sys.error("Expect the name of the file(s) to interpret")
-
-    val fileSources = args
-      .map(new java.io.File(_))
+    args.map(new java.io.File(_))
       .map(scala.io.Source.fromFile(_))
+      .flatMap { Parser(_) }
+      .map { Interpretter(_) }
+      .foreach { println(_) }
 
-    fileSources
-      .flatMap { x =>
-        val (forms, time) = timeFunc(Parser(x))
-        println("Parsing took: " + time)
-        forms
-      }
-      .foreach { x =>
-        val (res, time) = timeFunc(Interpretter(x))
-        println("Interpretting took: " + time)
-        println("Result: " + res)
-      }
   }
+
+  def parseArgs(args: Seq[String]) = {
+
+    val (toInterpret, toWatch) = args.partition(s => s == "--watch" || s == "-w")
+
+    val toInterpretFiles = toInterpret.map { x =>
+      if (x.startsWith("~")) x.tail else x
+    }
+
+    val toWatchFiles = (toInterpret.filter(_.startsWith("~")).map(_.tail) ++ toWatch)
+
+    toInterpretFiles -> toWatchFiles
+  }
+
   def timeFunc[A](fn: => A) = {
     val s = System.nanoTime
     val ret = fn

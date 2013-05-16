@@ -39,13 +39,13 @@ object Interpretter {
     import BuiltinFunctionNames._
 
     form match {
-
+      case s: Sym => {
+        require(e.contains(s), s"Could not find $s in environment $e")
+        e(s)
+      }
       case fnCall @ WList(WEval(fn) #:: rawArgs, _) =>
-
         def from = new ComputedSource(fnCall)
-
         fn match { // in order to tail call if/eval, can't just dynamic-dispatch out
-
           case UDF(capEnv, argS, envS, capCode, _) =>
             require(rawArgs.isEmpty)
             eval(capEnv + (Sym(argS) -> WList(rawArgs)) + (Sym(envS) -> WDict(e)), capCode)
@@ -72,26 +72,23 @@ object Interpretter {
             case DictInsert =>
               val Stream(DictEval(d), WEval(k), WEval(v)) = rawArgs
               WDict(d + ((k, v)))
-
             case DictMake => WDict(rawArgs.foldLeft(Dict) { case (p, PairEval(kv)) => p + kv }, from)
             case DictRemove =>
               val Stream(DictEval(d), WEval(k)) = rawArgs
               require(d.contains(k), s"Dictionary $d must contain $k in order to remove it, in $fnCall")
               WDict(d - k)
-
             case DictSize =>
               val Stream(DictEval(d)) = rawArgs
               Num(d.size)
-
             case DictToList =>
               val Stream(DictEval(d)) = rawArgs
               WList(d.toStream.map { case (k, v) => WList(Stream(k, v)) })
-
-            case Error => sys.error(s"Fatal error, triggered by $fnCall evaled args: " + rawArgs.map(eval(e, _)).mkString(" "))
+            case Error =>
+              val err = rawArgs.map(eval(e, _)).mkString(" ")
+              sys.error(s"Fatal error $err triggered by $fnCall")
             case Eval =>
               val Stream(DictEval(ue), uform) = rawArgs
               eval(ue, eval(e, uform))
-
             case If =>
               val Stream(BoolEval(cond), trueCase, falseCase) = rawArgs
               eval(e, if (cond) trueCase else falseCase)
@@ -201,15 +198,7 @@ object Interpretter {
 
               UDF(e, aS, eS, code, from)
           }
-
-          case x: WChar => sys.error(s"Cannot evaluate a Char. $x in $fnCall")
-          case x: WDict => sys.error(s"Cannot evalute a Dict. $x in $fnCall")
-          case x: WList => sys.error(s"Cannot evalute a List? $x in $fnCall")
-          case x: Sym => sys.error(s"Cannot evaluate a Symbol? $x in $fnCall")
-          case x: WType => sys.error(s"Cannot evalute a Type. $x in $fnCall")
-          case x: Bool => sys.error(s"Cannot evalute a Boolean. $x in $fnCall")
-          case x: Num => sys.error(s"Cannot evaluate a Num. $x in $fnCall")
-
+          case x => sys.error(s"Can not evaluate a $x in $fnCall")
         }
       case x => x // Note, this case catches an empty list too
     }

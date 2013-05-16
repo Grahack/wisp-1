@@ -11,4 +11,6 @@ libraryDependencies ++= Seq("org.specs2" %% "specs2" % "1.14" % "test",
 
 scalacOptions ++= Seq("-deprecation", "-feature")
 
+jarName in assembly := "wisp.jar"
+
 assemblySettings

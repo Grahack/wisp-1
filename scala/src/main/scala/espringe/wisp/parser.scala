@@ -24,7 +24,7 @@ object Parser extends Parsers {
           if (next.atEnd)
             res
           else
-            sys.error("Couldn't FULLY parse. We parsed: " + res + " but didn't get: " + next)
+            sys.error("Couldn't FULLY parse. We parsed: " + res + " but didn't get: " + next.source)
         }
         case f: Failure => sys.error("Parser failure: " + f.toString)
         case e: Error => sys.error("Parser error: " + e.toString)
@@ -32,7 +32,7 @@ object Parser extends Parsers {
     }
 
   private def fileParser: Parser[List[W]] = {
-    rep(blankLine) ~> repsep(lineParser(0), rep1(blankLine)) ~< rep(blankLine)
+    rep(blankLine) ~> repsep(lineParser(0), rep1(blankLine)) ~< rep(blankLine) ~< opt(terminatingBlankLine)
   }
 
   private def lineParser(depth: Int): Parser[W] =
@@ -51,6 +51,7 @@ object Parser extends Parsers {
 
   private def comment = ';' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
+  private def terminatingBlankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< opt(eol)
 
   private def atomParser: Parser[W] =
     ((numParser | charParser | listParser | literalStringParser | literalVectParser | symbolParser | literalDictParser | builtInSymbolParser) ~ opt('.' ~> atomParser) ^^
