@@ -207,11 +207,7 @@ object Interpretter {
               WList(a.value.name.toStream.map(WChar(_)))
             }
 
-            case Error =>
-              {
-                sys.error(s"Fatal error, triggered by $fnCall evaled args: " + rawArgs.map(eval(e, _)).mkString(" "))
-              }
-              ???
+            case Error => sys.error(s"Fatal error, triggered by $fnCall evaled args: " + rawArgs.map(eval(e, _)).mkString(" "))
 
           }
 

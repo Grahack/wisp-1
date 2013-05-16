@@ -8,6 +8,10 @@ import java.io.PrintWriter
 
 class ParserSpec extends Specification {
 
+  import BuiltinFunctionNames._
+  def bf(bf: BuiltinFunctionNames.Name) = BuiltinFunction(bf)
+  def l(values: W*) = WList(values.toStream)
+
   "The Parser" should {
 
     "actually able to load a real file" in {
@@ -32,79 +36,78 @@ class ParserSpec extends Specification {
     "can read chars" in {
       read("~q") must_== WChar('q')
 
-      read("~a ~b ~3 ~d ~e ~f") must_== WList(Stream(WChar('a'), WChar('b'), WChar('3'), WChar('d'), WChar('e'), WChar('f')))
+      read("~a ~b ~3 ~d ~e ~f") must_== l(WChar('a'), WChar('b'), WChar('3'), WChar('d'), WChar('e'), WChar('f'))
     }
 
     "be able to read a string" in {
-      read("\"soup\"") must_== WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake), WChar('s'), WChar('o'), WChar('u'), WChar('p')))
-      read("\"\"") must_== WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake)))
+      read("\"soup\"") must_== l(bf(ListMake), WChar('s'), WChar('o'), WChar('u'), WChar('p'))
+      read("\"\"") must_== l(bf(ListMake))
       read("\"tiger\"") must_== read("[~t ~i ~g ~e ~r]")
     }
 
     "work with quoted lists" in {
-      read("[a b c]") must_== WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake), Sym('a), Sym('b), Sym('c)))
-      read("[a [b 4]]") must_== WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake), Sym('a), WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake), Sym('b), Num(4)))))
+      read("[a b c]") must_== l(bf(ListMake), Sym('a), Sym('b), Sym('c))
+      read("[a [b 4]]") must_== l(bf(ListMake), Sym('a), l(bf(ListMake), Sym('b), Num(4)))
     }
 
     "read a dict" in {
-      read("{}") must_== Seq(BuiltinFunction(BuiltinFunctionNames.DictMake))
-      read("{\"soup\" key}") must_== Seq(new BuiltinFunction(BuiltinFunctionNames.DictMake) {}, Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), 's', 'o', 'u', 'p'), 'key))
-      read("{key value, \"dog\" 44, ~f 50}") must_== Seq(BuiltinFunction(BuiltinFunctionNames.DictMake),
-        Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), 'key, 'value),
-        Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), 'd', 'o', 'g'), 44),
-        Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), 'f', 50))
+      read("{}") must_== l(bf(DictMake))
+      read("{\"soup\" key}") must_== l(
+        bf(DictMake), l(bf(ListMake),
+          l(bf(ListMake), WChar('s'), WChar('o'), WChar('u'), WChar('p')), Sym('key)))
+
+      read("{key value, \"dog\" 44, ~f 50}") must_== l(bf(DictMake),
+        l(bf(ListMake), Sym('key), Sym('value)),
+        l(bf(ListMake), l(bf(ListMake), WChar('d'), WChar('o'), WChar('g')), Num(44)),
+        l(bf(ListMake), WChar('f'), Num(50)))
     }
 
-    //    "handle explicit function calls / lists" in {
-    //      read("(f a b)") must_== List('f, 'a, 'b)
-    //      read("(f a b)") must_== read("f a b")
-    //
-    //      read("f.x") must_== List('f, 'x)
-    //      read("loco.34") must_== List('loco, 34)
-    //      read("a f g.x") must_== read("a f (g x)")
-    //      //read
-    //
-    //      read("(f (a b) c)") must_== List('f, List('a, 'b), 'c)
-    //      read("(f a ") must throwA[Throwable]
-    //      read("f a a)") must throwA[Throwable]
-    //      read("(f (a a)") must throwA[Throwable]
-    //    }
-    //
-    //    "work with leading/trailing slines" in {
-    //      read("\ncat") must_== 'cat
-    //      read("shield\n") must_== 'shield
-    //    }
-    //
-    //    "handle significant whitespace" in {
-    //
-    //      read("""
-    //          |f
-    //          |	a""".stripMargin) must_== read("(f a)")
-    //
-    //      read("""
-    //    	 |f a b
-    //    	 |	c
-    //         |	d""".stripMargin) must_== read("(f a b c d)")
-    //
-    //      read("""
-    //    	 |f a b ; a comment
-    //    	 |	c.d e
-    //         | ; i don't like this, but the comment is space-prefixed
-    //         |
-    //         |		f
-    //         |		g h
-    //         |	i""".stripMargin) must_== read("(f a b ((c d) e f (g h)) i)")
-    //
-    //    }
-    //
-    //    "reads builtins" in {
-    //      read("#num-add") must beAnInstanceOf[NumAdd]
-    //      read("#list-make") must beAnInstanceOf[ListMake]
-    //
-    //      val pos = read("\nListHead\n\tListHead").asInstanceOf[WList].value(1).asInstanceOf[Positional].pos
-    //      pos.line must_== 3
-    //      pos.column must_== 2
-    //    }
+    "handle explicit function calls / lists" in {
+      read("(f a b)") must_== l(Sym('f), Sym('a), Sym('b))
+      read("(f a b)") must_== read("f a b")
+
+      read("f.x") must_== l(Sym('f), Sym('x))
+      read("loco.34") must_== l(Sym('loco), Num(34))
+      read("a f g.x") must_== read("a f (g x)")
+
+
+      read("(f (a b) c)") must_== l(Sym('f), l(Sym('a), Sym('b)), Sym('c))
+      read("(f a") must throwA[Throwable]
+      read("f a a)") must throwA[Throwable]
+      read("(f (a a)") must throwA[Throwable]
+    }
+
+    "work with leading/trailing slines" in {
+      read("\ncat") must_== Sym('cat)
+      read("shield\n") must_== Sym('shield)
+    }
+
+    "handle significant whitespace" in {
+
+      read("""
+              |f
+              |	a""".stripMargin) must_== read("(f a)")
+
+      read("""
+        	 |f a b
+        	 |	c
+             |	d""".stripMargin) must_== read("(f a b c d)")
+
+      read("""
+        	 |f a b ; a comment
+        	 |	c.d e
+             | ; i don't like this, but the comment is space-prefixed
+             |
+             |		f
+             |		g h
+             |	i""".stripMargin) must_== read("(f a b ((c d) e f (g h)) i)")
+
+    }
+
+    "reads builtins" in {
+      read("#num-add").asInstanceOf[BuiltinFunction].which must_== NumAdd
+      read("#list-make").asInstanceOf[BuiltinFunction].which must_== ListMake
+    }
 
   }
 

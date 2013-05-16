@@ -123,10 +123,8 @@ object Parser extends Parsers {
   private def builtInSymbolParser: Parser[W] = positioned('#' ~> rep1(nonSpecialChar) ^^ (x => PositionalString(x.mkString))) ^^
     { x =>
 
-
-
       import BuiltinFunctionNames._
-      
+
       BuiltinFunction(x.str match {
         case "if" => If
         case "eval" => Eval
