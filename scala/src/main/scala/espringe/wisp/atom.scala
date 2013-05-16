@@ -54,7 +54,7 @@ case class WDict(value: Dict, source: SourceInfo = UnknownSource) extends W(sour
 case class WList(value: Stream[W], source: SourceInfo = UnknownSource) extends W(source) {
 
   override def equals(o: Any) = o.isInstanceOf[WList] && value == o.asInstanceOf[WList].value
-  
+
   override def deparse = asString.map(x => s"'$x'")
     .getOrElse("(" + value.map(_.toString).mkString(" ") + ")")
   override def typeOf = Primitives.TypeList
@@ -85,31 +85,6 @@ case class Sym(value: Symbol, source: SourceInfo = UnknownSource) extends W(sour
   override def typeOf = Primitives.TypeSym
 }
 
-class If(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#if"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class Eval(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#eval"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class ReadFile(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#read"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class Parse(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#parse"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class Vau(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#vau"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
 case class UDF(capEnv: Dict, arg: Sym, env: Sym, capCode: W, source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse = "#???UDF???"
   override def typeOf = Primitives.TypeFunc
@@ -125,166 +100,55 @@ case class WType(value: Primitives.Primitive, source: SourceInfo = UnknownSource
   override def typeOf = Primitives.TypeType
 }
 
-class Deref(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#deref"
-  override def typeOf = Primitives.TypeBuiltIn
-
+object BuiltinFunctionNames extends Enumeration {
+  type Name = Value
+  val BoolNot, BoolEq, Deref,
+  DictContains, DictGet, DictInsert, DictRemove, DictSize, DictToList, DictMake,
+  Error, Eval, If, ListCons,
+  ListHead, ListIsEmpty, ListMake, ListTail,
+  NumAdd, NumDiv, NumGT, NumGTE, NumEq, NumLT, NumLTE, NumMult, NumSub, NumToCharList,
+  SymEq, SymToCharList, Trace, TypeEq, TypeOf, Vau, ReadFile, Parse = Value
 }
 
-class TypeEq(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#type-eq"
-  override def typeOf = Primitives.TypeBuiltIn
-
-}
-
-class TypeOf(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#type-of"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-// boolean
-class BoolNot(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#bool-not"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class BoolEq(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#bool-eq"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-// list stuff
-
-class ListCons(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#list-cons"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class ListHead(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#list-head"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class ListIsEmpty(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#list-empty?"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class ListMake(source: SourceInfo = UnknownSource) extends W(source) {
-  override def equals(o: Any) = o.isInstanceOf[ListMake]
-  override def deparse = "#list-make"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class ListTail(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#list-tail"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-// num
-class NumAdd(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#num-add"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class NumDiv(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#num-div"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class NumGT(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#num-gt"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class NumGTE(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#num-gte"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class NumEq(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#num-eq"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class NumLT(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#num-lt"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class NumLTE(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#num-lte"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class NumMult(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#num-mult"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class NumSub(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#num-sub"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class NumToCharList(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#num-to-char-list"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-// sym stuff
-
-class SymEq(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#sym-eq"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class SymToCharList(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#sym-to-char-list"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class DictContains(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#dict-contains"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class DictGet(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#dict-get"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class DictInsert(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#dict-insert"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class DictRemove(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#dict-remove"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class DictSize(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#dict-size"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class DictToList(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#dict-to-list"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class DictMake(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#dict-make"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class Trace(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#trace"
-  override def typeOf = Primitives.TypeBuiltIn
-}
-
-class WError(source: SourceInfo = UnknownSource) extends W(source) {
-  override def deparse = "#error"
+case class BuiltinFunction(which: BuiltinFunctionNames.Name, source: SourceInfo = UnknownSource) extends W(source) {
+  import BuiltinFunctionNames._
+ 
+  override def deparse = which match {
+    case If => "#if"
+    case Eval => "#eval"
+    case ReadFile => "#read"
+    case Parse => "#parse"
+    case Vau => "#vau"
+    case Deref => "#deref"
+    case TypeEq => "#type-eq"
+    case TypeOf => "#type-of"
+    case BoolNot => "#bool-not"
+    case BoolEq => "#bool-eq"
+    case ListCons => "#list-cons"
+    case ListHead => "#list-head"
+    case ListIsEmpty => "#list-empty?"
+    case ListMake => "#list-make"
+    case ListTail => "#list-tail"
+    case NumAdd => "#num-add"
+    case NumDiv => "#num-div"
+    case NumGT => "#num-gt"
+    case NumGTE => "#num-gte"
+    case NumEq => "#num-eq"
+    case NumLT => "#num-lt"
+    case NumLTE => "#num-lte"
+    case NumMult => "#num-mult"
+    case NumSub => "#num-sub"
+    case NumToCharList => "#num-to-char-list"
+    case SymEq => "#sym-eq"
+    case SymToCharList => "#sym-eq"
+    case DictContains => "#dict-contains"
+    case DictGet => "#dict-get"
+    case DictInsert => "#dict-insert"
+    case DictSize => "#dict-size"
+    case DictToList => "#dict-list"
+    case DictMake => "#dict-make"
+    case Trace => "#trace"
+    case Error => "#error"
+  }
   override def typeOf = Primitives.TypeBuiltIn
 }

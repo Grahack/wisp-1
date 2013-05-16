@@ -64,7 +64,7 @@ object Parser extends Parsers {
 
   private def literalVectParser = {
     ('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ { x =>
-      val mk = new ListMake
+      val mk = BuiltinFunction(BuiltinFunctionNames.ListMake)
       WList(mk #:: (x.toStream: Stream[W]))
     })
   }
@@ -72,12 +72,12 @@ object Parser extends Parsers {
   // {key value, key value, key value} 
   private def literalDictParser = ('{' ~> opt(singleSpace) ~> repsep(dictPairParser, ',' ~ singleSpace) ~< opt(singleSpace) <~ '}' ^^
     { x =>
-      val dm = new DictMake()
+      val dm = BuiltinFunction(BuiltinFunctionNames.DictMake)
       val stream: Stream[W] = x.toStream
       new WList(dm #:: stream)
     })
 
-  private def dictPairParser = atomParser ~< singleSpace ~ atomParser ^^ (x => new WList(Stream(new ListMake {}, x._1, x._2)))
+  private def dictPairParser = atomParser ~< singleSpace ~ atomParser ^^ (x => new WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake), x._1, x._2)))
 
   private def listToHashMap[A, B](values: List[(A, B)]): HashMap[A, B] = values.foldLeft(HashMap[A, B]()) {
     (state, next) =>
@@ -104,7 +104,7 @@ object Parser extends Parsers {
       c == '{' || c == '}'
 
   private def literalStringParser = '"' ~> rep((insideLiteralParser ^^ (new WChar(_)))) ~< '"' ^^ { x =>
-    val mk = new ListMake {}
+    val mk = BuiltinFunction(BuiltinFunctionNames.ListMake)
     new WList(mk #:: (x.toStream: Stream[W]))
   }
 
@@ -123,47 +123,47 @@ object Parser extends Parsers {
   private def builtInSymbolParser: Parser[W] = positioned('#' ~> rep1(nonSpecialChar) ^^ (x => PositionalString(x.mkString))) ^^
     { x =>
 
-      val p = LexicalSource("UnknownFile", x.pos.column, x.pos.line)
 
-      x.str match {
-        case "true" => new Bool(true, p)
-        case "false" => new Bool(false, p)
-        case "if" => new If(p)
-        case "eval" => new Eval(p)
-        case "read" => new ReadFile(p)
-        case "parse" => new Parse(p)
-        case "vau" => new Vau(p)
-        case "deref" => new Deref(p)
-        case "type-eq" => new TypeEq(p)
-        case "type-of" => new TypeOf(p)
-        case "bool-not" => new BoolNot(p)
-        case "bool-eq" => new BoolEq(p)
-        case "list-cons" => new ListCons(p)
-        case "list-head" => new ListHead(p)
-        case "list-empty?" => new ListIsEmpty(p)
-        case "list-make" => new ListMake(p)
-        case "list-tail" => new ListTail(p)
-        case "num-add" => new NumAdd(p)
-        case "num-div" => new NumDiv(p)
-        case "num-gt" => new NumGT(p)
-        case "num-gte" => new NumGTE(p)
-        case "num-eq" => new NumEq(p)
-        case "num-lt" => new NumLT(p)
-        case "num-lte" => new NumLTE(p)
-        case "num-mult" => new NumMult(p)
-        case "num-sub" => new NumSub(p)
-        case "num-to-char-list" => new NumToCharList(p)
-        case "sym-eq" => new SymEq(p)
-        case "sym-to-char-list" => new SymToCharList(p)
-        case "dict-contains" => new DictContains(p)
-        case "dict-get" => new DictGet(p)
-        case "dict-insert" => new DictInsert(p)
-        case "dict-size" => new DictSize(p)
-        case "dict-to-list" => new DictToList(p)
-        case "dict-make" => new DictMake(p)
-        case "trace" => new Trace(p)
-        case "error" => new WError(p)
-      }
+
+      import BuiltinFunctionNames._
+      
+      BuiltinFunction(x.str match {
+        case "if" => If
+        case "eval" => Eval
+        case "read" => ReadFile
+        case "parse" => Parse
+        case "vau" => Vau
+        case "deref" => Deref
+        case "type-eq" => TypeEq
+        case "type-of" => TypeOf
+        case "bool-not" => BoolNot
+        case "bool-eq" => BoolEq
+        case "list-cons" => ListCons
+        case "list-head" => ListHead
+        case "list-empty?" => ListIsEmpty
+        case "list-make" => ListMake
+        case "list-tail" => ListTail
+        case "num-add" => NumAdd
+        case "num-div" => NumDiv
+        case "num-gt" => NumGT
+        case "num-gte" => NumGTE
+        case "num-eq" => NumEq
+        case "num-lt" => NumLT
+        case "num-lte" => NumLTE
+        case "num-mult" => NumMult
+        case "num-sub" => NumSub
+        case "num-to-char-list" => NumToCharList
+        case "sym-eq" => SymEq
+        case "sym-to-char-list" => SymToCharList
+        case "dict-contains" => DictContains
+        case "dict-get" => DictGet
+        case "dict-insert" => DictInsert
+        case "dict-size" => DictSize
+        case "dict-to-list" => DictToList
+        case "dict-make" => DictMake
+        case "trace" => Trace
+        case "error" => BuiltinFunctionNames.Error
+      }, LexicalSource("UnknownFile", x.pos.column, x.pos.line))
 
     }
 

@@ -36,26 +36,25 @@ class ParserSpec extends Specification {
     }
 
     "be able to read a string" in {
-      read("\"soup\"") must_== WList(Stream(new ListMake, WChar('s'), WChar('o'), WChar('u'), WChar('p')))
-      read("\"\"") must_== WList(Stream(new ListMake))
+      read("\"soup\"") must_== WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake), WChar('s'), WChar('o'), WChar('u'), WChar('p')))
+      read("\"\"") must_== WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake)))
       read("\"tiger\"") must_== read("[~t ~i ~g ~e ~r]")
     }
 
     "work with quoted lists" in {
-      read("[a b c]") must_== WList(Stream(new ListMake, Sym('a), Sym('b), Sym('c)))
-      read("[a [b 4]]") must_== WList(Stream(new ListMake, Sym('a), WList(Stream(new ListMake, Sym('b), Num(4)))))
+      read("[a b c]") must_== WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake), Sym('a), Sym('b), Sym('c)))
+      read("[a [b 4]]") must_== WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake), Sym('a), WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake), Sym('b), Num(4)))))
     }
 
     "read a dict" in {
-      read("{}") must_== Seq(new DictMake {})
-      read("{\"soup\" key}") must_== Seq(new DictMake {}, Seq(new ListMake {}, Seq(new ListMake {}, 's', 'o', 'u', 'p'), 'key))
-      read("{key value, \"dog\" 44, ~f 50}") must_== Seq(new DictMake {},
-        Seq(new ListMake {}, 'key, 'value),
-        Seq(new ListMake {}, Seq(new ListMake {}, 'd', 'o', 'g'), 44),
-        Seq(new ListMake {}, 'f', 50))
+      read("{}") must_== Seq(BuiltinFunction(BuiltinFunctionNames.DictMake))
+      read("{\"soup\" key}") must_== Seq(new BuiltinFunction(BuiltinFunctionNames.DictMake) {}, Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), 's', 'o', 'u', 'p'), 'key))
+      read("{key value, \"dog\" 44, ~f 50}") must_== Seq(BuiltinFunction(BuiltinFunctionNames.DictMake),
+        Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), 'key, 'value),
+        Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), 'd', 'o', 'g'), 44),
+        Seq(BuiltinFunction(BuiltinFunctionNames.ListMake), 'f', 50))
     }
-    
-    
+
     //    "handle explicit function calls / lists" in {
     //      read("(f a b)") must_== List('f, 'a, 'b)
     //      read("(f a b)") must_== read("f a b")
