@@ -9,8 +9,6 @@ import java.io.PrintWriter
 class ParserSpec extends Specification {
 
   import BuiltinFunctionNames._
-  def bf(bf: BuiltinFunctionNames.Name) = BuiltinFunction(bf)
-  def l(values: W*) = WList(values.toStream)
 
   "The Parser" should {
 
@@ -22,64 +20,63 @@ class ParserSpec extends Specification {
       stream.write("434")
       stream.close()
 
-      Parser(scala.io.Source.fromFile(path)) must_== Seq(Num(434))
+      Parser(scala.io.Source.fromFile(path)) must_== Seq(434)
     }
 
     "be able to read a numbers" in {
-      read("44") must_== Num(44)
+      read("44") must_== 44
     }
 
     "be able to read a symbol" in {
-      read("cat") must_== Sym('cat)
+      read("cat") must_== 'cat
     }
 
     "can read chars" in {
-      read("~q") must_== WChar('q')
-
-      read("~a ~b ~3 ~d ~e ~f") must_== l(WChar('a'), WChar('b'), WChar('3'), WChar('d'), WChar('e'), WChar('f'))
+      read("~q") must_== 'q'
+      read("~a ~b ~3 ~d ~e ~f") must_== Seq('a','b','3','d','e','f')
     }
 
     "be able to read a string" in {
-      read("\"soup\"") must_== l(bf(ListMake), WChar('s'), WChar('o'), WChar('u'), WChar('p'))
-      read("\"\"") must_== l(bf(ListMake))
+      read("\"soup\"") must_== Seq(ListMake, 's', 'o', 'u', 'p')
+      read("\"\"") must_== Seq(ListMake)
       read("\"tiger\"") must_== read("[~t ~i ~g ~e ~r]")
     }
 
     "work with quoted lists" in {
-      read("[a b c]") must_== l(bf(ListMake), Sym('a), Sym('b), Sym('c))
-      read("[a [b 4]]") must_== l(bf(ListMake), Sym('a), l(bf(ListMake), Sym('b), Num(4)))
+      read("[a b c]") must_== Seq(ListMake, 'a, 'b, 'c)
+      read("[a [b 4]]") must_== Seq(ListMake, 'a, Seq(ListMake, 'b, 4))
     }
 
     "read a dict" in {
-      read("{}") must_== l(bf(DictMake))
-      read("{\"soup\" key}") must_== l(
-        bf(DictMake), l(bf(ListMake),
-          l(bf(ListMake), WChar('s'), WChar('o'), WChar('u'), WChar('p')), Sym('key)))
+      read("{}") must_== Seq(DictMake)
+      read("{\"soup\" key}") must_== Seq(
+        DictMake, Seq(ListMake,
+          Seq(ListMake, WChar('s'), WChar('o'), WChar('u'), WChar('p')), Sym('key)))
 
-      read("{key value, \"dog\" 44, ~f 50}") must_== l(bf(DictMake),
-        l(bf(ListMake), Sym('key), Sym('value)),
-        l(bf(ListMake), l(bf(ListMake), WChar('d'), WChar('o'), WChar('g')), Num(44)),
-        l(bf(ListMake), WChar('f'), Num(50)))
+      read("{key value, \"dog\" 44, ~f 50}") must_== Seq(DictMake,
+        Seq(ListMake, 'key, 'value),
+        Seq(ListMake, Seq(ListMake, 'd', 'o', 'g'), 44),
+        Seq(ListMake, WChar('f'), 50))
     }
 
     "handle explicit function calls / lists" in {
-      read("(f a b)") must_== l(Sym('f), Sym('a), Sym('b))
+      read("(f a b)") must_== Seq('f, 'a, 'b)
       read("(f a b)") must_== read("f a b")
 
-      read("f.x") must_== l(Sym('f), Sym('x))
-      read("loco.34") must_== l(Sym('loco), Num(34))
+      read("f.x") must_== Seq('f, 'x)
+      read("loco.34") must_== Seq('loco, 34)
       read("a f g.x") must_== read("a f (g x)")
 
 
-      read("(f (a b) c)") must_== l(Sym('f), l(Sym('a), Sym('b)), Sym('c))
+      read("(f (a b) c)") must_== Seq(Sym('f), Seq('a, 'b), 'c)
       read("(f a") must throwA[Throwable]
       read("f a a)") must throwA[Throwable]
       read("(f (a a)") must throwA[Throwable]
     }
 
     "work with leading/trailing slines" in {
-      read("\ncat") must_== Sym('cat)
-      read("shield\n") must_== Sym('shield)
+      read("\ncat") must_== 'cat
+      read("shield\n") must_== 'shield
     }
 
     "handle significant whitespace" in {
@@ -105,8 +102,8 @@ class ParserSpec extends Specification {
     }
 
     "reads builtins" in {
-      read("#num-add").asInstanceOf[BuiltinFunction].which must_== NumAdd
-      read("#list-make").asInstanceOf[BuiltinFunction].which must_== ListMake
+      read("#num-add") must_== NumAdd
+      read("#list-make") must_== ListMake
     }
 
   }

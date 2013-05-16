@@ -10,8 +10,8 @@ class InterpretterSpec extends Specification {
 
     "Return values untouched" in {
       interpret("3") must_== 3
-      interpret("#True") must_== true
-      interpret("#False") must_== false
+      interpret("#true") must_== true
+      interpret("#false") must_== false
     }
     
     "Work with quoted things" in {

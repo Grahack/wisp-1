@@ -125,43 +125,52 @@ object Parser extends Parsers {
 
       import BuiltinFunctionNames._
 
-      BuiltinFunction(x.str match {
-        case "if" => If
-        case "eval" => Eval
-        case "read" => ReadFile
-        case "parse" => Parse
-        case "vau" => Vau
-        case "deref" => Deref
-        case "type-eq" => TypeEq
-        case "type-of" => TypeOf
-        case "bool-not" => BoolNot
-        case "bool-eq" => BoolEq
-        case "list-cons" => ListCons
-        case "list-head" => ListHead
-        case "list-empty?" => ListIsEmpty
-        case "list-make" => ListMake
-        case "list-tail" => ListTail
-        case "num-add" => NumAdd
-        case "num-div" => NumDiv
-        case "num-gt" => NumGT
-        case "num-gte" => NumGTE
-        case "num-eq" => NumEq
-        case "num-lt" => NumLT
-        case "num-lte" => NumLTE
-        case "num-mult" => NumMult
-        case "num-sub" => NumSub
-        case "num-to-char-list" => NumToCharList
-        case "sym-eq" => SymEq
-        case "sym-to-char-list" => SymToCharList
-        case "dict-contains" => DictContains
-        case "dict-get" => DictGet
-        case "dict-insert" => DictInsert
-        case "dict-size" => DictSize
-        case "dict-to-list" => DictToList
-        case "dict-make" => DictMake
-        case "trace" => Trace
-        case "error" => BuiltinFunctionNames.Error
-      }, LexicalSource("UnknownFile", x.pos.column, x.pos.line))
+      val ls = LexicalSource("UnknownFile", x.pos.column, x.pos.line)
+
+      x.str match {
+        case "true" => Bool(true, ls)
+        case "false" => Bool(false, ls)
+        case fn =>
+          BuiltinFunction(
+            fn match {
+              case "bool-eq" => BoolEq
+              case "bool-not" => BoolNot
+              case "dict-contains" => DictContains
+              case "dict-get" => DictGet
+              case "dict-insert" => DictInsert
+              case "dict-make" => DictMake
+              case "dict-remove" => DictRemove
+              case "dict-size" => DictSize
+              case "dict-to-list" => DictToList
+              case "error" => BuiltinFunctionNames.Error
+              case "eval" => Eval
+              case "if" => If
+              case "list-cons" => ListCons
+              case "list-head" => ListHead
+              case "list-empty?" => ListIsEmpty
+              case "list-make" => ListMake
+              case "list-tail" => ListTail
+              case "num-add" => NumAdd
+              case "num-div" => NumDiv
+              case "num-eq" => NumEq
+              case "num-gt" => NumGT
+              case "num-gte" => NumGTE
+              case "num-lt" => NumLT
+              case "num-lte" => NumLTE
+              case "num-mult" => NumMult
+              case "num-sub" => NumSub
+              case "num-to-char-list" => NumToCharList
+              case "parse" => Parse
+              case "quote" => Quote
+              case "read-file" => ReadFile
+              case "sym-eq" => SymEq
+              case "sym-to-char-list" => SymToCharList
+              case "trace" => Trace
+              case "type-eq" => TypeEq
+              case "type-of" => TypeOf
+              case "vau" => Vau
+            }, ls)
+      }
 
     }
 
