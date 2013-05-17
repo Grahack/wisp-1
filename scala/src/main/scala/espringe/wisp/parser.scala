@@ -46,7 +46,7 @@ object Parser extends Parsers {
     if (a.length == 1 && b.length == 0)
       a.head
     else
-      WList(a.toStream ++ b.toStream)
+      WList(a ++ b)
   }
 
   private def comment = ';' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
@@ -54,19 +54,19 @@ object Parser extends Parsers {
   private def terminatingBlankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< opt(eol)
 
   private def atomParser: Parser[W] =
-    ((numParser | charParser | listParser | literalStringParser | literalVectParser | symbolParser | literalDictParser | builtInSymbolParser) ~ opt('.' ~> atomParser) ^^
-      (x => if (x._2.isDefined) WList(Stream(x._1, x._2.get)) else x._1))
+    (numParser | charParser | listParser | literalStringParser | literalVectParser | symbolParser | literalDictParser | builtInSymbolParser) ~ opt('.' ~> atomParser) ^^
+      { case a ~ b => if (b.isDefined) WList(Seq(a, b.get)) else a }
 
   private def charParser =
     ('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => new WChar(x)))
 
   private def listParser =
-    ('(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (x => new WList(x.toStream)))
+    ('(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (WList(_)))
 
   private def literalVectParser = {
     ('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ { x =>
       val mk = BuiltinFunction(BuiltinFunctionNames.ListMake)
-      WList(mk #:: (x.toStream: Stream[W]))
+      WList(mk +: x)
     })
   }
 
@@ -74,11 +74,15 @@ object Parser extends Parsers {
   private def literalDictParser = ('{' ~> opt(singleSpace) ~> repsep(dictPairParser, ',' ~ singleSpace) ~< opt(singleSpace) <~ '}' ^^
     { x =>
       val dm = BuiltinFunction(BuiltinFunctionNames.DictMake)
-      val stream: Stream[W] = x.toStream
-      new WList(dm #:: stream)
+
+      WList(dm +: x)
     })
 
-  private def dictPairParser = atomParser ~< singleSpace ~ atomParser ^^ (x => new WList(Stream(BuiltinFunction(BuiltinFunctionNames.ListMake), x._1, x._2)))
+  private def dictPairParser = atomParser ~< singleSpace ~ atomParser ^^
+    { x =>
+      val lm = BuiltinFunction(BuiltinFunctionNames.ListMake)
+      WList(Seq(lm, x._1, x._2))
+    }
 
   private def listToHashMap[A, B](values: List[(A, B)]): HashMap[A, B] = values.foldLeft(HashMap[A, B]()) {
     (state, next) =>
@@ -106,7 +110,7 @@ object Parser extends Parsers {
 
   private def literalStringParser = '"' ~> rep((insideLiteralParser ^^ (new WChar(_)))) ~< '"' ^^ { x =>
     val mk = BuiltinFunction(BuiltinFunctionNames.ListMake)
-    new WList(mk #:: (x.toStream: Stream[W]))
+    WList(mk +: x)
   }
 
   // TODO: allow string escaping

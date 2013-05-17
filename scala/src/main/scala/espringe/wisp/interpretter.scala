@@ -30,7 +30,10 @@ object Interpretter {
       def unapply(value: W) = eval(e, value).asType
     }
     object PairEval {
-      def unapply(value: W) = eval(e, value).asList.map { case Stream(a, b) => (a, b) }
+      def unapply(value: W) = eval(e, value) match {
+        case a ~: b ~: WNil() => Option((a, b))
+        case _ => None
+      }
     }
 
     import BuiltinFunctionNames._
@@ -40,127 +43,133 @@ object Interpretter {
         require(e.contains(s), s"Could not find $s in environment $e")
         e(s)
       }
-      case fnCall @ WList(WEval(fn) #:: rawArgs, _) =>
+      case fnCall @ WCons(WEval(fn), rawArgs, _) =>
         def from = new ComputedSource(fnCall)
         fn match { // in order to tail call if/eval, can't just dynamic-dispatch out
           case UDF(capEnv, argS, envS, capCode, _) =>
-            require(rawArgs.isEmpty)
-            eval(capEnv + (Sym(argS) -> WList(rawArgs)) + (Sym(envS) -> WDict(e)), capCode)
+            eval(capEnv + (Sym(argS) -> rawArgs) + (Sym(envS) -> WDict(e)), capCode)
 
           case BuiltinFunction(bf, _) => bf match {
 
             case BoolEq =>
-              val Stream(BoolEval(a), BoolEval(b)) = rawArgs
+              val BoolEval(a) ~: BoolEval(b) ~: WNil() = rawArgs
               Bool(a == b, from)
             case BoolNot =>
-              val Stream(BoolEval(a), BoolEval(b)) = rawArgs
+              val BoolEval(a), BoolEval(b) ~: WNil() = rawArgs
               Bool(a != b, from)
             case DictContains =>
-              val Stream(DictEval(a), WEval(k)) = rawArgs
+              val DictEval(a) ~: WEval(k) ~: WNil() = rawArgs
               Bool(a.contains(k))
             case DictGet =>
-              val Stream(DictEval(d), WEval(k)) = rawArgs
+              val DictEval(d) ~: WEval(k) ~: WNil() = rawArgs
               require(d.contains(k), s"Dictionary $d did not contain $k in $fnCall")
               d(k)
             case DictInsert =>
-              val Stream(DictEval(d), WEval(k), WEval(v)) = rawArgs
+              val DictEval(d) ~: WEval(k) ~: WEval(v) ~: WNil() = rawArgs
               WDict(d + ((k, v)))
             case DictMake => WDict(rawArgs.foldLeft(Dict) { case (p, PairEval(kv)) => p + kv }, from)
             case DictRemove =>
-              val Stream(DictEval(d), WEval(k)) = rawArgs
+              val DictEval(d) ~: WEval(k) ~: WNil() = rawArgs
               require(d.contains(k), s"Dictionary $d must contain $k in order to remove it, in $fnCall")
               WDict(d - k)
             case DictSize =>
-              val Stream(DictEval(d)) = rawArgs
+              val DictEval(d) ~: WNil() = rawArgs
               Num(d.size)
             case DictToList =>
-              val Stream(DictEval(d)) = rawArgs
-              WList(d.toStream.map { case (k, v) => WList(Stream(k, v)) })
+              val DictEval(d) ~: WNil() = rawArgs
+              WList(d.toSeq.map { case (k, v) => WList(Seq(k, v)) })
             case Error =>
               val err = rawArgs.map(eval(e, _)).mkString(" ")
               sys.error(s"Fatal error $err triggered by $fnCall")
             case Eval =>
-              val Stream(DictEval(ue), uform) = rawArgs
+              val DictEval(ue) ~: uform ~: WNil() = rawArgs
               eval(ue, eval(e, uform))
             case If =>
-              val Stream(BoolEval(cond), trueCase, falseCase) = rawArgs
+              val BoolEval(cond) ~: trueCase ~: falseCase ~: WNil() = rawArgs
               eval(e, if (cond) trueCase else falseCase)
             case ListCons =>
-              val Stream(ListEval(l), WEval(e)) = rawArgs
-              WList(e #:: l)
+              val WEval(l) ~: WEval(e) ~: WNil() = rawArgs
+              l match {
+                case l: WList => WCons(e, l)
+                case x => sys.error(s"Can't cons onto non-list: $l in $fnCall")
+              }
             case ListHead =>
-              val Stream(ListEval(l)) = rawArgs
+              val ListEval(l) ~: WNil() = rawArgs
               l.head
             case ListIsEmpty =>
-              val Stream(ListEval(l)) = rawArgs
+              val ListEval(l) ~: WNil() = rawArgs
               Bool(l.isEmpty)
             case ListMake =>
-              WList(rawArgs.map(eval(e, _)), from)
+              WList(rawArgs.map(eval(e, _)))
             case ListTail =>
-              val Stream(ListEval(l)) = rawArgs
-              WList(l.tail)
+              val WEval(l) ~: WNil() = rawArgs
+              l match {
+                case WCons(_, tail, _) => tail
+                case WEmpty(_) => sys.error(s"Can't call tail on empty list in $fnCall")
+                case x => sys.error("Can't call tail on non-list $x in $fnCall")
+              }
             case NumAdd =>
-              val Stream(NumEval(a), NumEval(b)) = rawArgs
+              val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Num(a + b)
             case NumDiv =>
-              val Stream(NumEval(a), NumEval(b)) = rawArgs
+              val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               require(b != 0, s"Divisor was zero in $fn")
               Num(a / b)
             case NumEq =>
-              val Stream(NumEval(a), NumEval(b)) = rawArgs
+              val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Bool(a == b)
             case NumGT =>
-              val Stream(NumEval(a), NumEval(b)) = rawArgs
+              val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Bool(a > b)
             case NumGTE =>
-              val Stream(NumEval(a), NumEval(b)) = rawArgs
+              val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Bool(a >= b)
             case NumLT =>
-              val Stream(NumEval(a), NumEval(b)) = rawArgs
+              val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Bool(a < b)
             case NumLTE =>
-              val Stream(NumEval(a), NumEval(b)) = rawArgs
+              val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Bool(a <= b)
             case NumMult =>
-              val Stream(NumEval(a), NumEval(b)) = rawArgs
+              val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Num(a * b)
             case NumSub =>
-              val Stream(NumEval(a), NumEval(b)) = rawArgs
+              val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Num(a - b)
             case NumToCharList =>
-              val Stream(NumEval(a)) = rawArgs
-              WList(a.toString.toStream.map(WChar(_)))
+              val NumEval(a) ~: WNil() = rawArgs
+              WList(a.toString.map(WChar(_)))
             case Parse =>
-              val Stream(ListEval(letters)) = rawArgs
+              val ListEval(letters) ~: WNil() = rawArgs
               val asString = letters.map { _.asChar.get }.mkString // ew
-              WList(Parser(asString).toStream)
+              WList(Parser(asString))
             case Quote =>
-              val Stream(a) = rawArgs
+              val a ~: WNil() = rawArgs
               a
             case ReadFile =>
-              val Stream(ListEval(fns)) = rawArgs
+              val ListEval(fns) = rawArgs
               val fileName = fns.map { c => c.asChar.get }.mkString
-              WList(io.Source.fromFile(fileName).toStream.map(WChar(_)), from)
+              WList(io.Source.fromFile(fileName).toStream.map(WChar(_)))
             case SymEq =>
-              val Stream(SymEval(a), SymEval(b)) = rawArgs
+              val SymEval(a) ~: SymEval(b) ~: WNil() = rawArgs
               Bool(a == b)
             case SymToCharList =>
-              val Stream(SymEval(a)) = rawArgs
-              WList(a.name.toStream.map(WChar(_)))
+              val SymEval(a) ~: WNil() = rawArgs
+              WList(a.name.map(WChar(_)))
             case Trace =>
-              rawArgs.map(eval(e, _)).foldLeft(WList(Stream()): W) {
+              rawArgs.map(eval(e, _)).foldLeft(WEmpty(): W) {
                 (p, n) =>
                   println(p)
                   n
               }
             case TypeEq =>
-              val Stream(TypeEval(a), TypeEval(b)) = rawArgs
+              val TypeEval(a) ~: TypeEval(b) ~: WNil() = rawArgs
               Bool(a == b, from)
             case TypeOf =>
-              val Stream(WEval(a)) = rawArgs
+              val WEval(a) ~: WNil() = rawArgs
               WType(a.typeOf, from)
             case Vau =>
-              val Stream(SymEval(aS), SymEval(eS), WEval(code)) = rawArgs
+              val SymEval(aS) ~: SymEval(eS) ~: WEval(code) ~: WNil() = rawArgs
 
               // make an exception for _ since it's so awesome
               require(aS == Symbol("_") || !e.contains(Sym(aS)), s"Found $aS in environment, in $fnCall")
