@@ -29,11 +29,8 @@ object Interpretter {
     object TypeEval {
       def unapply(value: W) = eval(e, value).asType
     }
-    object StreamEval {
-      def unapply(value: W) = eval(e, value).asStream
-    }
     object PairEval {
-      def unapply(value: W) = eval(e, value).asList.collect { case Stream(a, b) => (a, b) }
+      def unapply(value: W) = eval(e, value).asList.map { case Stream(a, b) => (a, b) }
     }
 
     import BuiltinFunctionNames._
@@ -61,14 +58,10 @@ object Interpretter {
             case DictContains =>
               val Stream(DictEval(a), WEval(k)) = rawArgs
               Bool(a.contains(k))
-
             case DictGet =>
               val Stream(DictEval(d), WEval(k)) = rawArgs
-
               require(d.contains(k), s"Dictionary $d did not contain $k in $fnCall")
-
               d(k)
-
             case DictInsert =>
               val Stream(DictEval(d), WEval(k), WEval(v)) = rawArgs
               WDict(d + ((k, v)))
@@ -95,99 +88,77 @@ object Interpretter {
             case ListCons =>
               val Stream(ListEval(l), WEval(e)) = rawArgs
               WList(e #:: l)
-
             case ListHead =>
               val Stream(ListEval(l)) = rawArgs
               l.head
-
             case ListIsEmpty =>
               val Stream(ListEval(l)) = rawArgs
               Bool(l.isEmpty)
-
             case ListMake =>
               WList(rawArgs.map(eval(e, _)), from)
             case ListTail =>
               val Stream(ListEval(l)) = rawArgs
               WList(l.tail)
-
             case NumAdd =>
               val Stream(NumEval(a), NumEval(b)) = rawArgs
               Num(a + b)
-
             case NumDiv =>
               val Stream(NumEval(a), NumEval(b)) = rawArgs
               require(b != 0, s"Divisor was zero in $fn")
               Num(a / b)
-
             case NumEq =>
               val Stream(NumEval(a), NumEval(b)) = rawArgs
               Bool(a == b)
-
             case NumGT =>
               val Stream(NumEval(a), NumEval(b)) = rawArgs
               Bool(a > b)
-
             case NumGTE =>
               val Stream(NumEval(a), NumEval(b)) = rawArgs
               Bool(a >= b)
-
             case NumLT =>
               val Stream(NumEval(a), NumEval(b)) = rawArgs
               Bool(a < b)
-
             case NumLTE =>
               val Stream(NumEval(a), NumEval(b)) = rawArgs
               Bool(a <= b)
-
             case NumMult =>
               val Stream(NumEval(a), NumEval(b)) = rawArgs
               Num(a * b)
-
             case NumSub =>
               val Stream(NumEval(a), NumEval(b)) = rawArgs
               Num(a - b)
-
             case NumToCharList =>
               val Stream(NumEval(a)) = rawArgs
               WList(a.toString.toStream.map(WChar(_)))
-
             case Parse =>
-              val Stream(StreamEval(letters)) = rawArgs
+              val Stream(ListEval(letters)) = rawArgs
               val asString = letters.map { _.asChar.get }.mkString // ew
               WList(Parser(asString).toStream)
-
             case Quote =>
               val Stream(a) = rawArgs
               a
-
             case ReadFile =>
-              val Stream(StreamEval(fns)) = rawArgs
+              val Stream(ListEval(fns)) = rawArgs
               val fileName = fns.map { c => c.asChar.get }.mkString
               WList(io.Source.fromFile(fileName).toStream.map(WChar(_)), from)
-
             case SymEq =>
               val Stream(SymEval(a), SymEval(b)) = rawArgs
               Bool(a == b)
-
             case SymToCharList =>
               val Stream(SymEval(a)) = rawArgs
               WList(a.name.toStream.map(WChar(_)))
-
             case Trace =>
               rawArgs.map(eval(e, _)).foldLeft(WList(Stream()): W) {
                 (p, n) =>
                   println(p)
                   n
               }
-
             case TypeEq =>
               val Stream(TypeEval(a), TypeEval(b)) = rawArgs
               Bool(a == b, from)
-
             case TypeOf =>
               val Stream(WEval(a)) = rawArgs
               WType(a.typeOf, from)
-
             case Vau =>
               val Stream(SymEval(aS), SymEval(eS), WEval(code)) = rawArgs
 

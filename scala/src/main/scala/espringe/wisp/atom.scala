@@ -31,7 +31,6 @@ sealed abstract class W(source: SourceInfo) {
   def asNum: Option[Long] = None
   def asSym: Option[Symbol] = None
   def asType: Option[Primitives.Primitive] = None
-  def asStream: Option[Stream[W]] = None
 
   override def hashCode: Int = value.hashCode
   override def equals(o: Any) = (o.isInstanceOf[W] && value == o.asInstanceOf[W].value) || value == o
@@ -59,7 +58,7 @@ case class WDict(value: Dict, source: SourceInfo = UnknownSource) extends W(sour
 
 case class WList(value: Stream[W], source: SourceInfo = UnknownSource) extends W(source) {
 
-  override def deparse = asString.map(x => s"'$x'")
+  override def deparse = asString.map(x => '"' + x + '"')
     .getOrElse("(" + value.map(_.toString).mkString(" ") + ")")
   override def typeOf = Primitives.TypeList
 
@@ -79,6 +78,14 @@ case class WList(value: Stream[W], source: SourceInfo = UnknownSource) extends W
   }
 
   override def asList = Some(value)
+  
+  override def equals(o: Any) = o match {
+    case w: W => value == w.value
+    case s: Seq[_] => value == s
+    case str: String => asString.map(_ == str).getOrElse(false)
+    case _ => false
+  }
+  
 }
 
 case class Num(value: Long, source: SourceInfo = UnknownSource) extends W(source) {

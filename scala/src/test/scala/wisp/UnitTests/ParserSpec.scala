@@ -105,6 +105,14 @@ class ParserSpec extends Specification {
       read("#num-add") must_== NumAdd
       read("#list-make") must_== ListMake
     }
+    
+    "read an empty file" in {
+      Parser("").length must_== 0
+    }
+    
+    "handle trailing comment, without a new line" in {
+      read("4 ; comment") must_== 4
+    }
 
   }
 
