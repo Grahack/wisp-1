@@ -21,7 +21,8 @@ class InterpretterSpec extends Specification {
       interpret("[1 2 [3 4 5]]") must_== Seq(1, 2, Seq(3, 4, 5))
       interpret("#quote 4") must_== 4
       interpret("#quote cat") must_== 'cat
-      interpret("#quote (2 for the money)") must_== Seq(2, 'for, 'the, 'money)
+      interpret("#quote (sqrt 4)") must_== 'sqrt -> Seq(4)
+      interpret("#quote [2 for the money]") must_== Seq(2, 'for, 'the, 'money)
     }
 
     "Basic function calls works" in {

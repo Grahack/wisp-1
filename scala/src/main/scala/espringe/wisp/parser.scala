@@ -39,14 +39,16 @@ object Parser extends Parsers {
     repN(depth, '\t') ~>
       (
         rep1sep(atomParser, singleSpace) ~
-        rep(rep1(blankLine) ~> lineParser(depth + 1)) ^^ (x => stitch(x._1, x._2)))
+        rep(rep1(blankLine) ~> lineParser(depth + 1)) ^^ { case a ~ b => stitch(a, b) })
 
   private def stitch(a: Seq[W], b: Seq[W]) = {
     assert(a.length >= 1)
     if (a.length == 1 && b.length == 0)
       a.head
-    else
-      WList(a ++ b)
+    else {
+      val total = a ++ b
+      FuncCall(total.head, WList(total.tail))
+    }
   }
 
   private def comment = ';' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
@@ -54,21 +56,18 @@ object Parser extends Parsers {
   private def terminatingBlankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< opt(eol)
 
   private def atomParser: Parser[W] =
-    (numParser | charParser | listParser | literalStringParser | literalVectParser | symbolParser | literalDictParser | builtInSymbolParser) ~ opt('.' ~> atomParser) ^^
-      { case a ~ b => if (b.isDefined) WList(Seq(a, b.get)) else a }
+    (numParser | charParser | listParser | literalStringParser | literalVectParser | symbolParser | literalDictParser | builtInSymbolParser) ~
+      opt('.' ~> atomParser) ^^
+      { case a ~ b => if (b.isDefined) FuncCall(a, WList(b)) else a }
 
   private def charParser =
     ('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => new WChar(x)))
 
   private def listParser =
-    ('(' ~> repsep(atomParser, singleSpace) ~< ')' ^^ (WList(_)))
+    ('(' ~> rep1sep(atomParser, singleSpace) ~< ')' ^^ (x => FuncCall(x.head, WList(x.tail))))
 
-  private def literalVectParser = {
-    ('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ { x =>
-      val mk = BuiltinFunction(BuiltinFunctionNames.ListMake)
-      WList(mk +: x)
-    })
-  }
+  private def literalVectParser =
+    ('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ { WList(_) })
 
   // {key value, key value, key value} 
   private def literalDictParser = ('{' ~> opt(singleSpace) ~> repsep(dictPairParser, ',' ~ singleSpace) ~< opt(singleSpace) <~ '}' ^^
@@ -79,10 +78,7 @@ object Parser extends Parsers {
     })
 
   private def dictPairParser = atomParser ~< singleSpace ~ atomParser ^^
-    { x =>
-      val lm = BuiltinFunction(BuiltinFunctionNames.ListMake)
-      WList(Seq(lm, x._1, x._2))
-    }
+    { case a ~ b => WList(Seq(a, b)) }
 
   private def listToHashMap[A, B](values: List[(A, B)]): HashMap[A, B] = values.foldLeft(HashMap[A, B]()) {
     (state, next) =>
@@ -108,10 +104,8 @@ object Parser extends Parsers {
       c == ',' || c == '#' ||
       c == '{' || c == '}'
 
-  private def literalStringParser = '"' ~> rep((insideLiteralParser ^^ (new WChar(_)))) ~< '"' ^^ { x =>
-    val mk = BuiltinFunction(BuiltinFunctionNames.ListMake)
-    WList(mk +: x)
-  }
+  private def literalStringParser = '"' ~> rep(insideLiteralParser ^^ (new WChar(_))) ~< '"' ^^
+    { WList(_) }
 
   // TODO: allow string escaping
   private def insideLiteralParser = acceptIf(x => x != '"' && x != '\n')("Unexpected '" + _ + "' when parsing inside a literal string")

@@ -43,7 +43,7 @@ object Interpretter {
         require(e.contains(s), s"Could not find $s in environment $e")
         e(s)
       }
-      case fnCall @ WEval(fn) ~: rawArgs =>
+      case fnCall @ FuncCall(WEval(fn), rawArgs, _) =>
         def from = new ComputedSource(fnCall)
         fn match { // in order to tail call if/eval, can't just dynamic-dispatch out
           case UDF(capEnv, argS, envS, capCode, _) =>
@@ -180,7 +180,7 @@ object Interpretter {
           }
           case x => sys.error(s"Can not evaluate a $x in $fnCall")
         }
-      case x => x // Note, this case catches an empty list too
+      case x => x
     }
 
   }

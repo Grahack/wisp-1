@@ -33,42 +33,42 @@ class ParserSpec extends Specification {
 
     "can read chars" in {
       read("~q") must_== 'q'
-      read("~a ~b ~3 ~d ~e ~f") must_== Seq('a','b','3','d','e','f')
+      read("~a ~b ~3 ~d ~e ~f") must_== 'a' -> Seq('b','3','d','e','f')
     }
 
     "be able to read a string" in {
-      read("\"soup\"") must_== Seq(ListMake, 's', 'o', 'u', 'p')
-      read("\"\"") must_== Seq(ListMake)
+      read("\"soup\"") must_== Seq('s', 'o', 'u', 'p')
+      read("\"\"") must_== Seq()
       read("\"tiger\"") must_== read("[~t ~i ~g ~e ~r]")
     }
 
     "work with quoted lists" in {
-      read("[a b c]") must_== Seq(ListMake, 'a, 'b, 'c)
-      read("[a [b 4]]") must_== Seq(ListMake, 'a, Seq(ListMake, 'b, 4))
+      read("[a b c]") must_== Seq('a, 'b, 'c)
+      read("[a [b 4]]") must_== Seq('a, Seq('b, 4))
     }
 
     "read a dict" in {
       read("{}") must_== Seq(DictMake)
       read("{\"soup\" key}") must_== Seq(
-        DictMake, Seq(ListMake,
-          Seq(ListMake, WChar('s'), WChar('o'), WChar('u'), WChar('p')), Sym('key)))
+        DictMake, Seq(
+            Seq(WChar('s'), WChar('o'), WChar('u'), WChar('p')), Sym('key)))
 
       read("{key value, \"dog\" 44, ~f 50}") must_== Seq(DictMake,
-        Seq(ListMake, 'key, 'value),
-        Seq(ListMake, Seq(ListMake, 'd', 'o', 'g'), 44),
-        Seq(ListMake, WChar('f'), 50))
+        Seq('key, 'value),
+        Seq(Seq('d', 'o', 'g'), 44),
+        Seq(WChar('f'), 50))
     }
 
     "handle explicit function calls / lists" in {
-      read("(f a b)") must_== Seq('f, 'a, 'b)
+      read("(f a b)") must_== 'f -> Seq('a, 'b)
       read("(f a b)") must_== read("f a b")
 
-      read("f.x") must_== Seq('f, 'x)
-      read("loco.34") must_== Seq('loco, 34)
+      read("f.x") must_== 'f -> Seq('x)
+      read("loco.34") must_== 'loco -> Seq(34)
       read("a f g.x") must_== read("a f (g x)")
 
 
-      read("(f (a b) c)") must_== Seq(Sym('f), Seq('a, 'b), 'c)
+      read("(f (a b) c)") must_== Sym('f) -> Seq('a -> Seq('b), 'c)
       read("(f a") must throwA[Throwable]
       read("f a a)") must throwA[Throwable]
       read("(f (a a)") must throwA[Throwable]

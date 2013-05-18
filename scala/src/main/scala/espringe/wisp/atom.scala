@@ -214,7 +214,7 @@ case class UDF(capEnv: Dict, arg: Symbol, env: Symbol, capCode: W, source: Sourc
 
 object Primitives extends Enumeration {
   type Primitive = Value
-  val TypeBool, TypeChar, TypeSym, TypeNum, TypeDict, TypeBuiltIn, TypeFunc, TypeList, TypeType = Value
+  val TypeApply, TypeBool, TypeChar, TypeSym, TypeNum, TypeDict, TypeBuiltIn, TypeFunc, TypeList, TypeType = Value
 }
 
 case class WType(value: Primitives.Primitive, source: SourceInfo = UnknownSource) extends W(source) {
@@ -231,6 +231,18 @@ case class WType(value: Primitives.Primitive, source: SourceInfo = UnknownSource
 object BuiltinFunctionNames extends Enumeration {
   type Name = Value
   val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, If, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Trace, TypeEq, TypeOf, Vau = Value
+}
+
+
+case class FuncCall(func: W, args: WList, source: SourceInfo = UnknownSource) extends W(source)  {
+  override def typeOf = Primitives.TypeApply
+  override def deparse = "(" + func.deparse + args.map(" " + _.deparse).mkString  + ")"
+  override def hashCode = "WApply".hashCode ^ func.hashCode ^ args.hashCode
+  override def equals(o: Any) = o match {
+    case FuncCall(f, a, _) => func == f && args == a
+    case (f, a) => func == f && args == a 
+    case _ => false
+  }
 }
 
 case class BuiltinFunction(value: BuiltinFunctionNames.Name, source: SourceInfo = UnknownSource) extends W(source) {
