@@ -70,15 +70,15 @@ object Parser extends Parsers {
     ('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ { WList(_) })
 
   // {key value, key value, key value} 
-  private def literalDictParser = ('{' ~> opt(singleSpace) ~> repsep(dictPairParser, ',' ~ singleSpace) ~< opt(singleSpace) <~ '}' ^^
+  private def literalDictParser = '{' ~> opt(singleSpace) ~> repsep(dictPairParser, singleSpace) ~< opt(singleSpace) <~ '}' ^^
     { x =>
-      val dm = BuiltinFunction(BuiltinFunctionNames.DictMake)
-
-      WList(dm +: x)
-    })
+      val m = x.toMap
+      require(m.size == x.length, s"When turning $x into a map, lost some keys making $m")
+      WDict(m)
+    }
 
   private def dictPairParser = atomParser ~< singleSpace ~ atomParser ^^
-    { case a ~ b => WList(Seq(a, b)) }
+    { case a ~ b => (a, b) }
 
   private def listToHashMap[A, B](values: List[(A, B)]): HashMap[A, B] = values.foldLeft(HashMap[A, B]()) {
     (state, next) =>
@@ -101,7 +101,7 @@ object Parser extends Parsers {
       c == '[' || c == ']' ||
       c == '~' || c == '"' ||
       c == ';' || c == '.' ||
-      c == ',' || c == '#' ||
+      c == '#' ||
       c == '{' || c == '}'
 
   private def literalStringParser = '"' ~> rep(insideLiteralParser ^^ (new WChar(_))) ~< '"' ^^

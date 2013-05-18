@@ -33,7 +33,7 @@ class ParserSpec extends Specification {
 
     "can read chars" in {
       read("~q") must_== 'q'
-      read("~a ~b ~3 ~d ~e ~f") must_== 'a' -> Seq('b','3','d','e','f')
+      read("~a ~b ~3 ~d ~e ~f") must_== 'a' -> Seq('b', '3', 'd', 'e', 'f')
     }
 
     "be able to read a string" in {
@@ -48,15 +48,13 @@ class ParserSpec extends Specification {
     }
 
     "read a dict" in {
-      read("{}") must_== Seq(DictMake)
-      read("{\"soup\" key}") must_== Seq(
-        DictMake, Seq(
-            Seq(WChar('s'), WChar('o'), WChar('u'), WChar('p')), Sym('key)))
+      read("{}") must_== Map()
+      read("{\"soup\" key}") must_== Map("soup" -> 'key)
 
-      read("{key value, \"dog\" 44, ~f 50}") must_== Seq(DictMake,
-        Seq('key, 'value),
-        Seq(Seq('d', 'o', 'g'), 44),
-        Seq(WChar('f'), 50))
+      read("{key value \"dog\" 44 ~f 50}") must_== Map(
+        'key -> 'value,
+        Seq('d', 'o', 'g') -> 44,
+        WChar('f') -> 50)
     }
 
     "handle explicit function calls / lists" in {
@@ -66,7 +64,6 @@ class ParserSpec extends Specification {
       read("f.x") must_== 'f -> Seq('x)
       read("loco.34") must_== 'loco -> Seq(34)
       read("a f g.x") must_== read("a f (g x)")
-
 
       read("(f (a b) c)") must_== Sym('f) -> Seq('a -> Seq('b), 'c)
       read("(f a") must throwA[Throwable]
@@ -105,11 +102,11 @@ class ParserSpec extends Specification {
       read("#num-add") must_== NumAdd
       read("#list-make") must_== ListMake
     }
-    
+
     "read an empty file" in {
       Parser("").length must_== 0
     }
-    
+
     "handle trailing comment, without a new line" in {
       read("4 ; comment") must_== 4
     }

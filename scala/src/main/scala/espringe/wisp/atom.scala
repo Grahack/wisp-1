@@ -157,7 +157,7 @@ class WCons(override val head: W, rest: => WList, source: SourceInfo = UnknownSo
   override def hashCode = head.hashCode ^ tail.hashCode
   override def equals(o: Any) = o match {
     case h ~: t => head == h && tail == t
-    case i: Iterable[_] => head == i.head && tail == i.tail
+    case i: Iterable[_] if !i.isEmpty => head == i.head && tail == i.tail
     case str: String => equals(str.toIterable)
     case _ => false
   }
