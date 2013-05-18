@@ -43,7 +43,7 @@ object Interpretter {
         require(e.contains(s), s"Could not find $s in environment $e")
         e(s)
       }
-      case fnCall @ WCons(WEval(fn), rawArgs, _) =>
+      case fnCall @ WEval(fn) ~: rawArgs =>
         def from = new ComputedSource(fnCall)
         fn match { // in order to tail call if/eval, can't just dynamic-dispatch out
           case UDF(capEnv, argS, envS, capCode, _) =>
@@ -90,7 +90,7 @@ object Interpretter {
             case ListCons =>
               val WEval(l) ~: WEval(e) ~: WNil() = rawArgs
               l match {
-                case l: WList => WCons(e, l)
+                case l: WList => new WCons(e, l)
                 case x => sys.error(s"Can't cons onto non-list: $l in $fnCall")
               }
             case ListHead =>
@@ -104,7 +104,7 @@ object Interpretter {
             case ListTail =>
               val WEval(l) ~: WNil() = rawArgs
               l match {
-                case WCons(_, tail, _) => tail
+                case _ ~: tail => tail
                 case WEmpty(_) => sys.error(s"Can't call tail on empty list in $fnCall")
                 case x => sys.error("Can't call tail on non-list $x in $fnCall")
               }

@@ -79,7 +79,7 @@ object WList {
     if (values.isEmpty)
       WEmpty()
     else
-      WCons(values.head, WList(values.tail))
+      new WCons(values.head, WList(values.tail))
   }
 }
 object WNil {
@@ -87,7 +87,7 @@ object WNil {
 }
 object ~: {
   def unapply(xs: WList): Option[(W, WList)] = xs match {
-    case WCons(x, rest, _) => Some((x, rest))
+    case x: WCons => Some((x.head, x.tail))
     case WEmpty(_) => None
   }
 }
@@ -112,7 +112,8 @@ case class WEmpty(source: SourceInfo = UnknownSource) extends W(source) with WLi
   }
   override def asList = Some(Iterable())
 }
-case class WCons(override val head: W, override val tail: WList, source: SourceInfo = UnknownSource) extends W(source) with WList {
+
+class WCons(override val head: W, rest: => WList, source: SourceInfo = UnknownSource) extends W(source) with WList {
   override def deparse = {
     val sb = StringBuilder.newBuilder
     sb += '['
@@ -123,7 +124,7 @@ case class WCons(override val head: W, override val tail: WList, source: SourceI
       at match {
         case _: WCons if sb.length > 1000 => // To not spam too much, and/or handle infinite lists
           sb ++= "..."
-        case WCons(head, tail, _) =>
+        case head ~: tail =>
           sb += ' '
           sb ++= head.deparse
           iterate(tail)
@@ -133,6 +134,7 @@ case class WCons(override val head: W, override val tail: WList, source: SourceI
     sb += ']'
     sb.result
   }
+  override def tail = rest
 
   override def asString: Option[String] = {
     val sb = StringBuilder.newBuilder
@@ -140,7 +142,7 @@ case class WCons(override val head: W, override val tail: WList, source: SourceI
     var at: WList = this
     while (true) {
       at match {
-        case WCons(WChar(head, _), tail, _) =>
+        case WChar(head, _) ~: tail =>
           sb += head
           at = tail
         case WEmpty(_) =>
@@ -154,7 +156,7 @@ case class WCons(override val head: W, override val tail: WList, source: SourceI
   override def typeOf = Primitives.TypeList
   override def hashCode = head.hashCode ^ tail.hashCode
   override def equals(o: Any) = o match {
-    case WCons(h, t, _) => head == h && tail == t
+    case h ~: t => head == h && tail == t
     case i: Iterable[_] => head == i.head && tail == i.tail
     case str: String => equals(str.toIterable)
     case _ => false
@@ -165,7 +167,7 @@ case class WCons(override val head: W, override val tail: WList, source: SourceI
     var at: WList = self
     override def hasNext = at.isInstanceOf[WCons]
     override def next: W = at match {
-      case WCons(head, tail, _) =>
+      case head ~: tail =>
         at = tail
         head
       case _ => sys.error(s"Overrused the iterator, previously was pointed at $at")
