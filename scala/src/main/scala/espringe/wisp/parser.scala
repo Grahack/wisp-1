@@ -101,8 +101,9 @@ object Parser extends Parsers {
       c == '[' || c == ']' ||
       c == '~' || c == '"' ||
       c == ';' || c == '.' ||
-      c == '#' ||
-      c == '{' || c == '}'
+      c == '{' || c == '}' ||
+      c == '#'
+
 
   private def literalStringParser = '"' ~> rep(insideLiteralParser ^^ (new WChar(_))) ~< '"' ^^
     { WList(_) }

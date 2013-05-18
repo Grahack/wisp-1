@@ -63,7 +63,7 @@ case class WChar(value: Char, source: SourceInfo = UnknownSource) extends W(sour
 
 case class WDict(value: Dict, source: SourceInfo = UnknownSource) extends W(source) {
   override def deparse =
-    "{" + value.toList.map(x => (x._1.toString + " " + x._2.toString)).mkString(", ") + "}"
+    "{" + value.map { case (k, v) => Seq(k.deparse, v.deparse) }.mkString(" ") + "}"
   override def typeOf = Primitives.TypeDict
   override def asDict = Some(value)
   override def hashCode = value.hashCode
@@ -233,14 +233,13 @@ object BuiltinFunctionNames extends Enumeration {
   val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, If, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Trace, TypeEq, TypeOf, Vau = Value
 }
 
-
-case class FuncCall(func: W, args: WList, source: SourceInfo = UnknownSource) extends W(source)  {
+case class FuncCall(func: W, args: WList, source: SourceInfo = UnknownSource) extends W(source) {
   override def typeOf = Primitives.TypeApply
-  override def deparse = "(" + func.deparse + args.map(" " + _.deparse).mkString  + ")"
+  override def deparse = "(" + func.deparse + args.map(" " + _.deparse).mkString + ")"
   override def hashCode = "WApply".hashCode ^ func.hashCode ^ args.hashCode
   override def equals(o: Any) = o match {
     case FuncCall(f, a, _) => func == f && args == a
-    case (f, a) => func == f && args == a 
+    case (f, a) => func == f && args == a
     case _ => false
   }
 }
