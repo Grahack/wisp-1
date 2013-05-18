@@ -13,4 +13,6 @@ scalacOptions ++= Seq("-deprecation", "-feature")
 
 jarName in assembly := "wisp.jar"
 
+test in assembly := {}
+
 assemblySettings
