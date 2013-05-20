@@ -17,7 +17,8 @@ class ComputedSource(from: W) extends SourceInfo {
   def print = "Computed from: \n\t" + from.toString.replaceAll("\n", "\n\t")
 }
 
-sealed abstract class W(source: SourceInfo) {
+sealed trait W {
+  def source: SourceInfo
   def deparse: String
   def typeOf: Primitives.Primitive
 
@@ -37,7 +38,7 @@ sealed abstract class W(source: SourceInfo) {
   override def toString = deparse
 }
 
-case class Bool(value: Boolean, source: SourceInfo = UnknownSource) extends W(source) {
+case class Bool(value: Boolean, source: SourceInfo = UnknownSource) extends W {
   override def deparse = if (value) "#true" else "#false"
   override def typeOf = Primitives.TypeBool
   override def asBool = Some(value)
@@ -49,7 +50,7 @@ case class Bool(value: Boolean, source: SourceInfo = UnknownSource) extends W(so
   }
 }
 
-case class WChar(value: Char, source: SourceInfo = UnknownSource) extends W(source) {
+case class WChar(value: Char, source: SourceInfo = UnknownSource) extends W {
   override def deparse = "~" + value
   override def typeOf = Primitives.TypeChar
   override def asChar = Some(value)
@@ -61,7 +62,7 @@ case class WChar(value: Char, source: SourceInfo = UnknownSource) extends W(sour
   }
 }
 
-case class WDict(value: Dict, source: SourceInfo = UnknownSource) extends W(source) {
+case class WDict(value: Dict, source: SourceInfo = UnknownSource) extends W {
   override def deparse =
     "{" + value.map { case (k, v) => Seq(k.deparse, v.deparse) }.mkString(" ") + "}"
   override def typeOf = Primitives.TypeDict
@@ -92,9 +93,9 @@ object ~: {
   }
 }
 
-sealed trait WList extends W with Iterable[W]
+sealed trait WList extends Iterable[W] with W 
 
-case class WEmpty(source: SourceInfo = UnknownSource) extends W(source) with WList {
+case class WEmpty(source: SourceInfo = UnknownSource) extends WList {
   override def deparse = "[]"
   override def typeOf = Primitives.TypeList
   override def hashCode = "WEmpty".hashCode
@@ -113,7 +114,7 @@ case class WEmpty(source: SourceInfo = UnknownSource) extends W(source) with WLi
   override def asList = Some(Iterable())
 }
 
-class WCons(override val head: W, rest: => WList, source: SourceInfo = UnknownSource) extends W(source) with WList {
+class WCons(override val head: W, rest: => WList, override val source: SourceInfo = UnknownSource) extends WList {
   override def deparse = {
     val sb = StringBuilder.newBuilder
     sb += '['
@@ -177,7 +178,7 @@ class WCons(override val head: W, rest: => WList, source: SourceInfo = UnknownSo
   override def asList = Some(iterator.toIterable)
 }
 
-case class Num(value: Long, source: SourceInfo = UnknownSource) extends W(source) {
+case class Num(value: Long, source: SourceInfo = UnknownSource) extends W {
   override def deparse = value.toString
   override def typeOf = Primitives.TypeNum
   override def asNum = Some(value)
@@ -190,7 +191,7 @@ case class Num(value: Long, source: SourceInfo = UnknownSource) extends W(source
   }
 }
 
-case class Sym(value: Symbol, source: SourceInfo = UnknownSource) extends W(source) {
+case class Sym(value: Symbol, source: SourceInfo = UnknownSource) extends W {
   override def deparse = value.name
   override def typeOf = Primitives.TypeSym
   override def asSym = Some(value)
@@ -202,7 +203,7 @@ case class Sym(value: Symbol, source: SourceInfo = UnknownSource) extends W(sour
   }
 }
 
-case class UDF(capEnv: Dict, arg: Symbol, env: Symbol, capCode: W, source: SourceInfo = UnknownSource) extends W(source) {
+case class UDF(capEnv: Dict, arg: Symbol, env: Symbol, capCode: W, source: SourceInfo = UnknownSource) extends W {
   override def deparse = "#???UDF???"
   override def typeOf = Primitives.TypeFunc
   override def hashCode = capEnv.hashCode ^ arg.hashCode ^ env.hashCode ^ capCode.hashCode
@@ -217,7 +218,7 @@ object Primitives extends Enumeration {
   val TypeApply, TypeBool, TypeChar, TypeSym, TypeNum, TypeDict, TypeBuiltIn, TypeFunc, TypeList, TypeType = Value
 }
 
-case class WType(value: Primitives.Primitive, source: SourceInfo = UnknownSource) extends W(source) {
+case class WType(value: Primitives.Primitive, source: SourceInfo = UnknownSource) extends W {
   override def deparse = "{Type: " + value.toString + "}"
   override def typeOf = Primitives.TypeType
   override def hashCode = value.hashCode
@@ -233,7 +234,7 @@ object BuiltinFunctionNames extends Enumeration {
   val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, If, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Trace, TypeEq, TypeOf, Vau = Value
 }
 
-case class FuncCall(func: W, args: WList, source: SourceInfo = UnknownSource) extends W(source) {
+case class FuncCall(func: W, args: WList, source: SourceInfo = UnknownSource) extends W {
   override def typeOf = Primitives.TypeApply
   override def deparse = "(" + func.deparse + args.map(" " + _.deparse).mkString + ")"
   override def hashCode = "WApply".hashCode ^ func.hashCode ^ args.hashCode
@@ -244,7 +245,7 @@ case class FuncCall(func: W, args: WList, source: SourceInfo = UnknownSource) ex
   }
 }
 
-case class BuiltinFunction(value: BuiltinFunctionNames.Name, source: SourceInfo = UnknownSource) extends W(source) {
+case class BuiltinFunction(value: BuiltinFunctionNames.Name, source: SourceInfo = UnknownSource) extends W {
   import BuiltinFunctionNames._
 
   override def deparse = value match {
