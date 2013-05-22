@@ -64,7 +64,7 @@ case class WChar(value: Char, source: SourceInfo = UnknownSource) extends W {
 
 case class WDict(value: Dict, source: SourceInfo = UnknownSource) extends W {
   override def deparse =
-    "{" + value.map { case (k, v) => Seq(k.deparse, v.deparse) }.mkString(" ") + "}"
+    "{" + value.flatMap { case (k, v) => Seq(k.deparse, v.deparse) }.mkString(" ") + "}"
   override def typeOf = Primitives.TypeDict
   override def asDict = Some(value)
   override def hashCode = value.hashCode
@@ -93,7 +93,7 @@ object ~: {
   }
 }
 
-sealed trait WList extends Iterable[W] with W 
+sealed trait WList extends Iterable[W] with W
 
 case class WEmpty(source: SourceInfo = UnknownSource) extends WList {
   override def deparse = "[]"
@@ -115,7 +115,10 @@ case class WEmpty(source: SourceInfo = UnknownSource) extends WList {
 }
 
 class WCons(override val head: W, rest: => WList, override val source: SourceInfo = UnknownSource) extends WList {
-  override def deparse = {
+  override def deparse = asLiteralString.getOrElse(asLiteralList)
+  override def tail = rest
+
+  private def asLiteralList = {
     val sb = StringBuilder.newBuilder
     sb += '['
     sb ++= head.deparse
@@ -135,18 +138,38 @@ class WCons(override val head: W, rest: => WList, override val source: SourceInf
     sb += ']'
     sb.result
   }
-  override def tail = rest
+
+  private def asLiteralString: Option[String] = {
+    val sb = StringBuilder.newBuilder
+    sb += '"'
+
+    var at: WList = this
+    while (!at.isInstanceOf[WEmpty]) {
+      at match {
+        case WChar(head, _) ~: tail =>
+          if (head == '"' || head == '\\') {
+            sb += '\\'
+          }
+          sb += head
+          at = tail
+        case _ => return None
+      }
+    }
+
+    sb += '"'
+    Some(sb.result)
+
+  }
 
   override def asString: Option[String] = {
     val sb = StringBuilder.newBuilder
 
     var at: WList = this
-    while (true) {
+    while (!at.isInstanceOf[WEmpty]) {
       at match {
         case WChar(head, _) ~: tail =>
           sb += head
           at = tail
-        case WEmpty(_) =>
         case _ => return None
       }
     }
@@ -231,7 +254,7 @@ case class WType(value: Primitives.Primitive, source: SourceInfo = UnknownSource
 
 object BuiltinFunctionNames extends Enumeration {
   type Name = Value
-  val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, If, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Trace, TypeEq, TypeOf, Vau = Value
+  val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, If, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Then, Trace, TypeEq, TypeOf, Vau = Value
 }
 
 case class FuncCall(func: W, args: WList, source: SourceInfo = UnknownSource) extends W {

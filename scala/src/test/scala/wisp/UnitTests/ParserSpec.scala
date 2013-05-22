@@ -21,6 +21,7 @@ class ParserSpec extends Specification {
       stream.close()
 
       Parser(scala.io.Source.fromFile(path)) must_== Seq(434)
+      path.delete()
     }
 
     "be able to read a numbers" in {

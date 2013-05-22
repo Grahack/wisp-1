@@ -39,6 +39,7 @@ class InterpretterSpec extends Specification {
 
   }
 
-  def interpret(s: String) = Interpretter(Parser(s)(0))
+  private val interpretter = new Interpretter(null)
+  def interpret(s: String) = interpretter(Parser(s)(0))
 
 }

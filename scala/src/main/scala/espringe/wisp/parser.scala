@@ -165,10 +165,12 @@ object Parser extends Parsers {
               case "read-file" => ReadFile
               case "sym-eq" => SymEq
               case "sym-to-char-list" => SymToCharList
+              case "then" => Then
               case "trace" => Trace
               case "type-eq" => TypeEq
               case "type-of" => TypeOf
               case "vau" => Vau
+              case x => sys.error(s"During parsing, did not recognise builtin $x") 
             }, ls)
       }
 

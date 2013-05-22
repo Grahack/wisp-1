@@ -5,10 +5,14 @@ object Main {
   def main(args: Array[String]) {
     require(args.size == 1, "Expected a single argument, the file to run")
 
-    args.map(new java.io.File(_))
-      .map(scala.io.Source.fromFile(_))
-      .flatMap { Parser(_) }
-      .map { Interpretter(_) }
+    val file = new java.io.File(args.head)
+    val dir = file.getParentFile()
+    require(dir != null, s"Could not get parent dir for $file")
+
+    val interpretter = new Interpretter(dir)
+    
+    Parser(scala.io.Source.fromFile(file))
+      .map { interpretter(_) }
       .foreach { println(_) }
 
   }

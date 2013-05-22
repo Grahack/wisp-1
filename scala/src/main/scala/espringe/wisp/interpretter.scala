@@ -1,6 +1,6 @@
 package espringe.wisp
 
-object Interpretter {
+class Interpretter(dir: java.io.File) {
 
   import scala.collection.immutable.HashMap
 
@@ -40,7 +40,7 @@ object Interpretter {
 
     form match {
       case s: Sym => {
-        require(e.contains(s), s"Could not find $s in environment $e")
+        require(e.contains(s), s"Could not find '$s' in environment $e")
         e(s)
       }
       case fnCall @ FuncCall(WEval(fn), rawArgs, _) =>
@@ -67,7 +67,14 @@ object Interpretter {
             case DictInsert =>
               val DictEval(d) ~: WEval(k) ~: WEval(v) ~: WNil() = rawArgs
               WDict(d + ((k, v)))
-            case DictMake => WDict(rawArgs.foldLeft(Dict) { case (p, PairEval(kv)) => p + kv }, from)
+            case DictMake =>
+              WDict(
+                rawArgs.map { x =>
+                  eval(e, x) match {
+                    case k ~: v ~: WNil() => (k, v)
+                    case x => sys.error(s"Expecting a [k v] in #dictMake, but instead got $x in $fnCall")
+                  }
+                }.toMap)
             case DictRemove =>
               val DictEval(d) ~: WEval(k) ~: WNil() = rawArgs
               require(d.contains(k), s"Dictionary $d must contain $k in order to remove it, in $fnCall")
@@ -147,21 +154,23 @@ object Interpretter {
               val a ~: WNil() = rawArgs
               a
             case ReadFile =>
-              val ListEval(fns) = rawArgs
-              val fileName = fns.map { c => c.asChar.get }.mkString
-              WList(io.Source.fromFile(fileName).toStream.map(WChar(_)))
+              val WEval(str) ~: WNil() = rawArgs
+              val fileName = str.asString.getOrElse(sys.error(s"#ReadFile expected a string (a list of chars) but got $str"))
+              WList(io.Source.fromFile(new java.io.File(dir, fileName)).toStream.map(WChar(_)))
             case SymEq =>
               val SymEval(a) ~: SymEval(b) ~: WNil() = rawArgs
               Bool(a == b)
             case SymToCharList =>
               val SymEval(a) ~: WNil() = rawArgs
               WList(a.name.map(WChar(_)))
+            case Then =>
+              val WEval(_) ~: WEval(second) = rawArgs
+              second
             case Trace =>
-              rawArgs.map(eval(e, _)).foldLeft(WEmpty(): W) {
-                (p, n) =>
-                  println(p)
-                  n
-              }
+              require(!rawArgs.isEmpty, s"Can not #trace nothing, in $fnCall")
+              val results = rawArgs.map(eval(e, _))
+              println(results.mkString(" "))
+              results.last
             case TypeEq =>
               val TypeEval(a) ~: TypeEval(b) ~: WNil() = rawArgs
               Bool(a == b, from)
