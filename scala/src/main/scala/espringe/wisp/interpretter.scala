@@ -17,6 +17,9 @@ class Interpretter(dir: java.io.File) {
     object DictEval {
       def unapply(value: W) = eval(e, value).asDict
     }
+    object FnCallEval {
+      def unapply(value: W) = eval(e, value).asFnCall
+    }
     object NumEval {
       def unapply(value: W) = eval(e, value).asNum
     }
@@ -43,7 +46,7 @@ class Interpretter(dir: java.io.File) {
         require(e.contains(s), s"Could not find '$s' in environment $e")
         e(s)
       }
-      case fnCall @ FuncCall(WEval(fn), rawArgs, _) =>
+      case fnCall @ FnCall(WEval(fn), rawArgs, _) =>
         def from = new ComputedSource(fnCall)
         fn match { // in order to tail call if/eval, can't just dynamic-dispatch out
           case UDF(capEnv, argS, envS, capCode, _) =>
@@ -91,6 +94,15 @@ class Interpretter(dir: java.io.File) {
             case Eval =>
               val DictEval(ue) ~: uform ~: WNil() = rawArgs
               eval(ue, eval(e, uform))
+            case FnCallArgs =>
+              val FnCallEval(fnc) ~: WNil() = rawArgs
+              fnc.args
+            case FnCallFn =>
+              val FnCallEval(fnc)  ~: WNil() = rawArgs
+              fnc.func
+            case FnCallMake =>
+              val WEval(fnc) ~: ListEval(args) ~: WNil() = rawArgs
+              FnCall(fnc, WList(args))
             case If =>
               val BoolEval(cond) ~: trueCase ~: falseCase ~: WNil() = rawArgs
               eval(e, if (cond) trueCase else falseCase)
@@ -164,8 +176,8 @@ class Interpretter(dir: java.io.File) {
               val SymEval(a) ~: WNil() = rawArgs
               WList(a.name.map(WChar(_)))
             case Then =>
-              val WEval(_) ~: WEval(second) = rawArgs
-              second
+              val WEval(_) ~: second = rawArgs
+              eval(e, second) // to be a tail call
             case Trace =>
               require(!rawArgs.isEmpty, s"Can not #trace nothing, in $fnCall")
               val results = rawArgs.map(eval(e, _))

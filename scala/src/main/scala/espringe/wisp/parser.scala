@@ -47,7 +47,7 @@ object Parser extends Parsers {
       a.head
     else {
       val total = a ++ b
-      FuncCall(total.head, WList(total.tail))
+      FnCall(total.head, WList(total.tail))
     }
   }
 
@@ -58,13 +58,13 @@ object Parser extends Parsers {
   private def atomParser: Parser[W] =
     (numParser | charParser | listParser | literalStringParser | literalVectParser | symbolParser | literalDictParser | builtInSymbolParser) ~
       opt('.' ~> atomParser) ^^
-      { case a ~ b => if (b.isDefined) FuncCall(a, WList(b)) else a }
+      { case a ~ b => if (b.isDefined) FnCall(a, WList(b)) else a }
 
   private def charParser =
     ('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => new WChar(x)))
 
   private def listParser =
-    ('(' ~> rep1sep(atomParser, singleSpace) ~< ')' ^^ (x => FuncCall(x.head, WList(x.tail))))
+    ('(' ~> rep1sep(atomParser, singleSpace) ~< ')' ^^ (x => FnCall(x.head, WList(x.tail))))
 
   private def literalVectParser =
     ('[' ~> repsep(atomParser, singleSpace) ~< ']' ^^ { WList(_) })
@@ -144,6 +144,9 @@ object Parser extends Parsers {
               case "dict-to-list" => DictToList
               case "error" => BuiltinFunctionNames.Error
               case "eval" => Eval
+              case "fn-call-args" => FnCallArgs
+              case "fn-call-fn" => FnCallFn
+              case "fn-call-make" => FnCallMake
               case "if" => If
               case "list-cons" => ListCons
               case "list-head" => ListHead
