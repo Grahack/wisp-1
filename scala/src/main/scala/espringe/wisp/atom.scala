@@ -94,7 +94,9 @@ object ~: {
   }
 }
 
-sealed trait WList extends Iterable[W] with W
+sealed trait WList extends Iterable[W] with W {
+  def mapW(f: W => W): WList
+}
 
 case class WEmpty(source: SourceInfo = UnknownSource) extends WList {
   override def deparse = "[]"
@@ -113,11 +115,13 @@ case class WEmpty(source: SourceInfo = UnknownSource) extends WList {
     override def next: W = sys.error("Can't call next an iterator of an empty list")
   }
   override def asList = Some(Iterable())
+  override def mapW(f: W => W) = WEmpty()
 }
 
 class WCons(override val head: W, rest: => WList, override val source: SourceInfo = UnknownSource) extends WList {
   override def deparse = asLiteralString.getOrElse(asLiteralList)
   override def tail = rest
+  override def mapW(f: W => W) = new WCons(f(head), rest.mapW(f))
 
   private def asLiteralList = {
     val sb = StringBuilder.newBuilder
@@ -228,7 +232,7 @@ case class Sym(value: Symbol, source: SourceInfo = UnknownSource) extends W {
 }
 
 case class UDF(capEnv: Dict, arg: Symbol, env: Symbol, capCode: W, source: SourceInfo = UnknownSource) extends W {
-  override def deparse = "#???UDF???"
+  override def deparse = "#UDF#"
   override def typeOf = Primitives.TypeFunc
   override def hashCode = capEnv.hashCode ^ arg.hashCode ^ env.hashCode ^ capCode.hashCode
   override def equals(o: Any) = o match {
@@ -255,18 +259,27 @@ case class WType(value: Primitives.Primitive, source: SourceInfo = UnknownSource
 
 object BuiltinFunctionNames extends Enumeration {
   type Name = Value
-  val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, FnCallArgs, FnCallFn, FnCallMake,
-  If, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Then, Trace, TypeEq, TypeOf, Vau = Value
+  val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, FnCallArgs, FnCallFn, FnCallMake, If, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Then, Trace, TypeEq, TypeOf, Vau = Value
 }
 
 case class FnCall(func: W, args: WList, source: SourceInfo = UnknownSource) extends W {
   override def typeOf = Primitives.TypeApply
-  override def deparse = "(" + func.deparse + args.map(" " + _.deparse).mkString + ")"
+  override def deparse = hasOneArg.map(arg => func.deparse + "." + arg.deparse)
+   .getOrElse("(" + func.deparse + args.map(" " + _.deparse).mkString + ")")
+    
+    
+    
   override def hashCode = "WApply".hashCode ^ func.hashCode ^ args.hashCode
   override def equals(o: Any) = o match {
     case FnCall(f, a, _) => func == f && args == a
     case (f, a) => func == f && args == a
     case _ => false
+  }
+
+  private def hasOneArg: Option[W] = (func, args) match {
+    case (f: FnCall, _) if f.hasOneArg.isDefined => None
+    case (_, single ~: WNil()) => Some(single)
+    case _ => None
   }
 }
 

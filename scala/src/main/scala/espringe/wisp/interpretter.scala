@@ -43,11 +43,13 @@ class Interpretter(dir: java.io.File) {
 
     form match {
       case s: Sym => {
-        require(e.contains(s), s"Could not find '$s' in environment $e")
+        require(e.contains(s), s"Could not find $s in environment $e")
         e(s)
       }
       case fnCall @ FnCall(WEval(fn), rawArgs, _) =>
         def from = new ComputedSource(fnCall)
+        def evaledArgs = rawArgs.mapW(eval(e, _))
+        
         fn match { // in order to tail call if/eval, can't just dynamic-dispatch out
           case UDF(capEnv, argS, envS, capCode, _) =>
             eval(capEnv + (Sym(argS) -> rawArgs) + (Sym(envS) -> WDict(e)), capCode)
@@ -98,11 +100,13 @@ class Interpretter(dir: java.io.File) {
               val FnCallEval(fnc) ~: WNil() = rawArgs
               fnc.args
             case FnCallFn =>
-              val FnCallEval(fnc)  ~: WNil() = rawArgs
+              val FnCallEval(fnc) ~: WNil() = rawArgs
               fnc.func
             case FnCallMake =>
-              val WEval(fnc) ~: ListEval(args) ~: WNil() = rawArgs
-              FnCall(fnc, WList(args))
+              rawArgs match {
+                case WEval(fnc) ~: ListEval(args) ~: WNil() => FnCall(fnc, WList(args))
+                case x => sys.error(s"#fn-call-make expected two arguments a function and a list, instead got: $x in $fnCall")
+              }
             case If =>
               val BoolEval(cond) ~: trueCase ~: falseCase ~: WNil() = rawArgs
               eval(e, if (cond) trueCase else falseCase)
@@ -113,8 +117,10 @@ class Interpretter(dir: java.io.File) {
                 case x => sys.error(s"Can't cons onto non-list: $l in $fnCall")
               }
             case ListHead =>
-              val ListEval(l) ~: WNil() = rawArgs
-              l.head
+              evaledArgs match {
+                case (l ~: _) ~: WNil() => l
+                case x => sys.error(s"#list-head expected a non-empty list, instead found $x in $fnCall")
+              }
             case ListIsEmpty =>
               val ListEval(l) ~: WNil() = rawArgs
               Bool(l.isEmpty)
@@ -147,8 +153,10 @@ class Interpretter(dir: java.io.File) {
               val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Bool(a < b)
             case NumLTE =>
-              val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
-              Bool(a <= b)
+              rawArgs match {
+                case NumEval(a) ~: NumEval(b) ~: WNil() => Bool(a <= b)
+                case x => sys.error(s"#num-lte expected 2 numbers, instead got: $x in $fnCall")
+              }              
             case NumMult =>
               val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Num(a * b)
@@ -176,7 +184,7 @@ class Interpretter(dir: java.io.File) {
               val SymEval(a) ~: WNil() = rawArgs
               WList(a.name.map(WChar(_)))
             case Then =>
-              val WEval(_) ~: second = rawArgs
+              val WEval(_) ~: second ~: WNil() = rawArgs
               eval(e, second) // to be a tail call
             case Trace =>
               require(!rawArgs.isEmpty, s"Can not #trace nothing, in $fnCall")
@@ -199,7 +207,7 @@ class Interpretter(dir: java.io.File) {
 
               UDF(e, aS, eS, code, from)
           }
-          case x => sys.error(s"Can not evaluate a $x in $fnCall")
+          case x => sys.error(s"Can not evaluate $x {${x.getClass()}}in $fnCall")
         }
       case x => x
     }

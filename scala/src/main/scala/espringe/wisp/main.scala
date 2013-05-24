@@ -10,24 +10,11 @@ object Main {
     require(dir != null, s"Could not get parent dir for $file")
 
     val interpretter = new Interpretter(dir)
-    
+
     Parser(scala.io.Source.fromFile(file))
       .map { interpretter(_) }
       .foreach { println(_) }
 
-  }
-
-  def parseArgs(args: Seq[String]) = {
-
-    val (toInterpret, toWatch) = args.partition(s => s == "--watch" || s == "-w")
-
-    val toInterpretFiles = toInterpret.map { x =>
-      if (x.startsWith("~")) x.tail else x
-    }
-
-    val toWatchFiles = (toInterpret.filter(_.startsWith("~")).map(_.tail) ++ toWatch)
-
-    toInterpretFiles -> toWatchFiles
   }
 
   def timeFunc[A](fn: => A) = {
