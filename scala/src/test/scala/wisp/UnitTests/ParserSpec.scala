@@ -89,9 +89,9 @@ class ParserSpec extends Specification {
              |	d""".stripMargin) must_== read("(f a b c d)")
 
       read("""
-        	 |f a b ; a comment
+        	 |f a b # a comment
         	 |	c.d e
-             | ; i don't like this, but the comment is space-prefixed
+             | # i don't like this, but the comment is space-prefixed
              |
              |		f
              |		g h
@@ -100,8 +100,8 @@ class ParserSpec extends Specification {
     }
 
     "reads builtins" in {
-      read("#num-add") must_== NumAdd
-      read("#list-make") must_== ListMake
+      read("$num-add") must_== NumAdd
+      read("$list-make") must_== ListMake
     }
 
     "read an empty file" in {
@@ -109,7 +109,7 @@ class ParserSpec extends Specification {
     }
 
     "handle trailing comment, without a new line" in {
-      read("4 ; comment") must_== 4
+      read("4 # comment") must_== 4
     }
 
   }

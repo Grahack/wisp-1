@@ -207,7 +207,7 @@ class Interpretter(dir: java.io.File) {
 
               UDF(e, aS, eS, code, from)
           }
-          case x => sys.error(s"Can not evaluate $x {${x.getClass()}}in $fnCall")
+          case x => sys.error(s"Can not evaluate $x in $fnCall")
         }
       case x => x
     }

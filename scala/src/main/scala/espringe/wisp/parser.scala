@@ -51,7 +51,7 @@ object Parser extends Parsers {
     }
   }
 
-  private def comment = ';' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
+  private def comment = '#' ~> rep(acceptIf(_ != '\n')("Didn't expect: " + _ + " in comment"))
   private def blankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< eol
   private def terminatingBlankLine = rep(elem(' ') | elem('\t')) ~> opt(comment) ~< opt(eol)
 
@@ -100,9 +100,9 @@ object Parser extends Parsers {
       c == '(' || c == ')' ||
       c == '[' || c == ']' ||
       c == '~' || c == '"' ||
-      c == ';' || c == '.' ||
+      c == '#' || c == '.' ||
       c == '{' || c == '}' ||
-      c == '#'
+      c == '$' || c == '\\'
 
 
   private def literalStringParser = '"' ~> rep(insideLiteralParser ^^ (new WChar(_))) ~< '"' ^^
@@ -120,7 +120,7 @@ object Parser extends Parsers {
 
   private def nonSpecialChar = acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for builtin symbol")
 
-  private def builtInSymbolParser: Parser[W] = positioned('#' ~> rep1(nonSpecialChar) ^^ (x => PositionalString(x.mkString))) ^^
+  private def builtInSymbolParser: Parser[W] = positioned('$' ~> rep1(nonSpecialChar) ^^ (x => PositionalString(x.mkString))) ^^
     { x =>
 
       import BuiltinFunctionNames._
