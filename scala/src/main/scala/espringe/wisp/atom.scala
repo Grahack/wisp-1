@@ -3,92 +3,90 @@ package espringe.wisp
 import scala.collection.immutable.HashMap
 import scala.util.parsing.input.Positional
 
-sealed trait SourceInfo {
-  def print: String
-}
-object UnknownSource extends SourceInfo {
-  def print = "Source: Unknown"
-}
-
-case class LexicalSource(file: String, column: Long, line: Long) extends SourceInfo {
-  def print = s"Source: $file column $column line $line"
-}
-class ComputedSource(from: W) extends SourceInfo {
-  def print = "Computed from: \n\t" + from.toString.replaceAll("\n", "\n\t")
-}
-
 sealed trait W {
   def source: SourceInfo
   def deparse: String
   def typeOf: Primitives.Primitive
 
-  def asBuiltin: Option[BuiltinFunctionNames.Name] = None
-  def asBool: Option[Boolean] = None
-  def asChar: Option[Char] = None
-  def asDict: Option[Dict] = None
-  def asFnCall: Option[FnCall] = None
-  def asList: Option[Iterable[W]] = None
-  def asNum: Option[Long] = None
-  def asSym: Option[Symbol] = None
-  def asType: Option[Primitives.Primitive] = None
+  def getBoolean: Option[Boolean] = None
+  def getChar: Option[Char] = None
+  def getDict: Option[Dict] = None
+  def getFunctionCall: Option[(W, WList)] = None
+  def getLong: Option[Long] = None
+  def getSymbol: Option[Symbol] = None
+  def getBuiltinFunctionName: Option[BuiltinFunctionNames.Name] = None
 
   override def hashCode: Int = sys.error(s"Implementation misssing in $this")
   override def equals(o: Any): Boolean = sys.error(s"Implementation misssing in $this")
   override def toString = deparse
 }
 
-case class Bool(value: Boolean, source: SourceInfo = UnknownSource) extends W {
+object Bool {
+  def apply(value: Boolean)(implicit source: SourceInfo) = new Bool(value, source)
+  def unapply(value: W): Option[Boolean] = value.getBoolean
+}
+
+class Bool(val value: Boolean, val source: SourceInfo) extends W {
   override def deparse = if (value) "$true" else "$false"
   override def typeOf = Primitives.TypeBool
-  override def asBool = Some(value)
   override def hashCode = value.hashCode
   override def equals(o: Any) = o match {
-    case Bool(b, _) => value == b
+    case Bool(b) => value == b
     case b: Boolean => value == b
     case _ => false
   }
+
+  override def getBoolean = Some(value)
 }
 
-case class WChar(value: Char, source: SourceInfo = UnknownSource) extends W {
+
+object WChar {
+  def apply(value: Char)(implicit source: SourceInfo) = new WChar(value, source)
+  def unapply(value: W): Option[Char] = value.getChar
+}
+class WChar(val value: Char, val source: SourceInfo) extends W {
   override def deparse = "~" + value
   override def typeOf = Primitives.TypeChar
-  override def asChar = Some(value)
   override def hashCode = value.hashCode
   override def equals(o: Any) = o match {
-    case WChar(c, _) => value == c
+    case WChar(c) => value == c
     case c: Char => value == c
     case _ => false
   }
+  override def getChar = Some(value)
 }
 
-case class WDict(value: Dict, source: SourceInfo = UnknownSource) extends W {
+object WDict {
+  def apply(value: Dict = new HashMap())(implicit source: SourceInfo) = new WDict(value, source)
+  def unapply(value: W) = value.getDict
+}
+
+class WDict(val value: Dict, val source: SourceInfo) extends W {
   override def deparse =
     "{" + value.flatMap { case (k, v) => Seq(k.deparse, v.deparse) }.mkString(" ") + "}"
   override def typeOf = Primitives.TypeDict
-  override def asDict = Some(value)
   override def hashCode = value.hashCode
   override def equals(o: Any) = o match {
-    case WDict(d, _) => value == d
+    case WDict(d) => value == d
     case d: Dict => value == d
     case _ => false
   }
+  override def getDict = Some(value)
 }
 
 object WList {
-  def apply(values: Iterable[W]): WList = { // TODO: handle source-info stuff...
+  def apply(values: Iterable[W])(implicit source: SourceInfo): WList = { // TODO: handle source-info stuff...
     if (values.isEmpty)
-      WEmpty()
+      WNil
     else
-      new WCons(values.head, WList(values.tail))
+      new WCons(values.head, WList(values.tail), source)
   }
 }
-object WNil {
-  def unapply(xs: WList): Boolean = xs.isInstanceOf[WEmpty]
-}
+
 object ~: {
   def unapply(xs: WList): Option[(W, WList)] = xs match {
     case x: WCons => Some((x.head, x.tail))
-    case WEmpty(_) => None
+    case WNil => None
   }
 }
 
@@ -97,30 +95,36 @@ sealed trait WList extends Iterable[W] with W {
   def asString: Option[String]
 }
 
-case class WEmpty(source: SourceInfo = UnknownSource) extends WList {
+object WNil extends WList {
+  override def source = new SourceInfo { override def print = "global nil" }
+
+  def unapply(xs: WList): Boolean = xs.isInstanceOf[WNil.type]
+
   override def deparse = "[]"
   override def typeOf = Primitives.TypeList
   override def hashCode = "WEmpty".hashCode
-  override def equals(o: Any) = o match {
-    case WEmpty(_) => true
+  override def equals(o: Any) = o.isInstanceOf[WNil.type] || (o match {
     case i: Iterable[_] => i.isEmpty
     case "" => true
     case _ => false
-  }
+  })
   override def asString = Some("")
 
   override def iterator = new Iterator[W] {
     override def hasNext = false
     override def next: W = sys.error("Can't call next an iterator of an empty list")
   }
-  override def asList = Some(Iterable())
-  override def mapW(f: W => W) = WEmpty()
+  override def mapW(f: W => W) = WNil
 }
 
-class WCons(override val head: W, rest: => WList, override val source: SourceInfo = UnknownSource) extends WList {
+object WCons {
+  def apply(head: W, rest: => WList)(implicit source: SourceInfo) = new WCons(head, rest, source) 
+}
+
+class WCons(override val head: W, rest: => WList, val source: SourceInfo) extends WList {
   override def deparse = asLiteralString.getOrElse(asLiteralList)
   override def tail = rest
-  override def mapW(f: W => W) = new WCons(f(head), rest.mapW(f))
+  override def mapW(f: W => W) = new WCons(f(head), rest.mapW(f), source) // TODO: this source isn't quite right
 
   private def asLiteralList = {
     val sb = StringBuilder.newBuilder
@@ -136,7 +140,7 @@ class WCons(override val head: W, rest: => WList, override val source: SourceInf
           sb += ' '
           sb ++= head.deparse
           iterate(tail)
-        case WEmpty(_) =>
+        case WNil =>
       }
     }
     sb += ']'
@@ -148,9 +152,9 @@ class WCons(override val head: W, rest: => WList, override val source: SourceInf
     sb += '"'
 
     var at: WList = this
-    while (!at.isInstanceOf[WEmpty]) {
+    while (!at.isInstanceOf[WNil.type]) {
       at match {
-        case WChar(head, _) ~: tail =>
+        case WChar(head) ~: tail =>
           if (head == '"' || head == '\\') {
             sb += '\\'
           }
@@ -169,9 +173,9 @@ class WCons(override val head: W, rest: => WList, override val source: SourceInf
     val sb = StringBuilder.newBuilder
 
     var at: WList = this
-    while (!at.isInstanceOf[WEmpty]) {
+    while (!at.isInstanceOf[WNil.type]) {
       at match {
-        case WChar(head, _) ~: tail =>
+        case WChar(head) ~: tail =>
           sb += head
           at = tail
         case _ => return None
@@ -202,55 +206,75 @@ class WCons(override val head: W, rest: => WList, override val source: SourceInf
     }
   }
 
-  override def asList = Some(iterator.toIterable)
 }
 
-case class Num(value: Long, source: SourceInfo = UnknownSource) extends W {
+object Num {
+  def apply(value: Long)(implicit source: SourceInfo) = new Num(value, source)
+  def unapply(value: W) = value.getLong
+}
+
+class Num(val value: Long, val source: SourceInfo) extends W {
   override def deparse = value.toString
   override def typeOf = Primitives.TypeNum
-  override def asNum = Some(value)
   override def hashCode = value.hashCode
   override def equals(o: Any) = o match {
-    case Num(n, _) => value == n
+    case Num(n) => value == n
     case i: Int => value == i
     case l: Long => value == l
     case _ => false
   }
+  override def getLong = Some(value)
 }
 
-case class Sym(value: Symbol, source: SourceInfo = UnknownSource) extends W {
+object Sym {
+  def apply(value: Symbol)(implicit source: SourceInfo) = new Sym(value, source)
+  def unapply(value: W): Option[Symbol] = value.getSymbol
+}
+class Sym(val value: Symbol, val source: SourceInfo) extends W {
   override def deparse = value.name
   override def typeOf = Primitives.TypeSym
-  override def asSym = Some(value)
   override def hashCode = value.hashCode
   override def equals(o: Any) = o match {
-    case Sym(s, _) => value == s
+    case Sym(s) => value == s
     case s: Symbol => value == s
     case _ => false
   }
+  override def getSymbol = Some(value)
 }
 
-case class UDF(capEnv: Dict, arg: Symbol, env: Symbol, capCode: W, source: SourceInfo = UnknownSource) extends W {
+case class UDF(capEnv: WDict, arg: Sym, env: Sym, capCode: W)(implicit val source: SourceInfo) extends W {
   override def deparse = "$UDF$"
   override def typeOf = Primitives.TypeFunc
   override def hashCode = capEnv.hashCode ^ arg.hashCode ^ env.hashCode ^ capCode.hashCode
   override def equals(o: Any) = o match {
-    case UDF(ce, a, e, c, _) => capEnv == ce && arg == a && env == e && capCode == c
+    case UDF(ce, a, e, c) => capEnv == ce && arg == a && env == e && capCode == c
     case _ => false
   }
 }
 
 object Primitives extends Enumeration {
   type Primitive = Value
-  val TypeApply, TypeBool, TypeChar, TypeSym, TypeNum, TypeDict, TypeBuiltIn, TypeFunc, TypeList, TypeType = Value
+  val TypeApply, TypeBool, TypeChar, TypeSym, TypeNum, TypeDict, TypeBuiltin, TypeFunc, TypeList, TypeType = Value
 }
 
-case class WType(value: Primitives.Primitive, source: SourceInfo = UnknownSource) extends W {
-  override def deparse = "{Type: " + value.toString + "}"
+case class WType(value: Primitives.Primitive)(implicit val source: SourceInfo) extends W {
+  import Primitives._
+  override def deparse = value match {
+    case TypeApply => "$type-apply"
+    case TypeBool => "$type-bool"
+    case TypeChar => "$type-char"
+    case TypeSym => "$type-sym"
+    case TypeNum => "$type-num"
+    case TypeDict => "$type-dict"
+    case TypeBuiltin => "$type-builtin"
+    case TypeFunc => "$type-func"
+    case TypeList => "$type-list"
+    case TypeType => "$type-type"
+  }
   override def typeOf = Primitives.TypeType
   override def hashCode = value.hashCode
   override def equals(o: Any) = o match {
-    case WType(v, _) => value == v
+    case WType(v) => value == v
     case p: Primitives.Primitive => value == p
     case _ => false
   }
@@ -261,26 +285,12 @@ object BuiltinFunctionNames extends Enumeration {
   val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, FnCallArgs, FnCallFn, FnCallMake, If, Let, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Then, Trace, TypeEq, TypeOf, Vau = Value
 }
 
-case class FnCall(func: W, args: WList, source: SourceInfo = UnknownSource) extends W {
-  override def typeOf = Primitives.TypeApply
-  override def deparse = hasOneArg.map(arg => func.deparse + "." + arg.deparse)
-    .getOrElse("(" + func.deparse + args.map(" " + _.deparse).mkString + ")")
-
-  override def hashCode = "WApply".hashCode ^ func.hashCode ^ args.hashCode
-  override def equals(o: Any) = o match {
-    case FnCall(f, a, _) => func == f && args == a
-    case (f, a) => func == f && args == a
-    case _ => false
-  }
-
-  private def hasOneArg: Option[W] = (func, args) match {
-    case (f: FnCall, _) if f.hasOneArg.isDefined => None
-    case (_, single ~: WNil()) => Some(single)
-    case _ => None
-  }
+object BuiltinFunction {
+  def apply(value: BuiltinFunctionNames.Name)(implicit source: SourceInfo) = new BuiltinFunction(value, source)
+  def unapply(value: W) = value.getBuiltinFunctionName
 }
 
-case class BuiltinFunction(value: BuiltinFunctionNames.Name, source: SourceInfo = UnknownSource) extends W {
+class BuiltinFunction(val value: BuiltinFunctionNames.Name, val source: SourceInfo) extends W {
   import BuiltinFunctionNames._
 
   override def deparse = value match {
@@ -326,22 +336,51 @@ case class BuiltinFunction(value: BuiltinFunctionNames.Name, source: SourceInfo 
     case Vau => "$vau"
 
   }
-  override def typeOf = Primitives.TypeBuiltIn
-  override def asBuiltin = Some(value)
+  override def typeOf = Primitives.TypeBuiltin
 
   override def hashCode = value.hashCode
   override def equals(o: Any) = o match {
-    case BuiltinFunction(bf, _) => value == bf
+    case BuiltinFunction(bf) => value == bf
     case n: BuiltinFunctionNames.Name => value == n
     case _ => false
   }
+
+  override def getBuiltinFunctionName = Some(value)
 }
 
-class Lazy(var what: W, val source: SourceInfo = UnknownSource) extends W {
+object FnCall {
+  def apply(func: W, args: WList)(implicit source: SourceInfo) = new FnCall(func, args, source)
+  def unapply(value: W) = value.getFunctionCall
+}
+
+class FnCall(val func: W, val args: WList, val source: SourceInfo) extends W {
+  override def typeOf = Primitives.TypeApply
+  override def deparse = hasOneArg.map(arg => func.deparse + "." + arg.deparse)
+    .getOrElse("(" + func.deparse + args.map(" " + _.deparse).mkString + ")")
+
+  override def hashCode = "WApply".hashCode ^ func.hashCode ^ args.hashCode
+  override def equals(o: Any) = o match {
+    case FnCall(f, a) => func == f && args == a
+    case (f, a) => func == f && args == a
+    case _ => false
+  }
+
+  private def hasOneArg: Option[W] = (func, args) match {
+    case (f: FnCall, _) if f.hasOneArg.isDefined => None
+    case (_, single ~: WNil()) => Some(single)
+    case _ => None
+  }
+
+  override def getFunctionCall = Some((func, args))
+}
+
+// This is a state machine, that switches from unevaled to eval and forwards
+// all requests
+class Lazy(var what: W)(implicit val source: SourceInfo) extends W {
 
   private var evaler: W => W = null
   private var state: Char = 0
-  
+
   def setEvaler(fn: W => W) {
     synchronized {
       assert(state == 0 && evaler == null)
@@ -352,23 +391,14 @@ class Lazy(var what: W, val source: SourceInfo = UnknownSource) extends W {
 
   override def deparse = get().deparse
   override def typeOf = get().typeOf
-  override def asBuiltin: Option[BuiltinFunctionNames.Name] = get().asBuiltin
-  override def asBool: Option[Boolean] = get().asBool
-  override def asChar: Option[Char] = get().asChar
-  override def asDict: Option[Dict] = get().asDict
-  override def asFnCall: Option[FnCall] = get().asFnCall
-  override def asList: Option[Iterable[W]] = get().asList
-  override def asNum: Option[Long] = get().asNum
-  override def asSym: Option[Symbol] = get().asSym
-  override def asType: Option[Primitives.Primitive] = get().asType
 
-  override def hashCode: Int = sys.error(s"Implementation misssing in $this")
-  override def equals(o: Any): Boolean = sys.error(s"Implementation misssing in $this")
+  override def hashCode: Int = get().hashCode
+  override def equals(o: Any): Boolean = get() == o
 
-  private def get() = synchronized {
+  def get() = synchronized {
     state match {
       case 0 => sys.error("Lazy object has not had evaler set yet")
-      case 1 => // in evaluation
+      case 1 => // unevalued
         assert(evaler != null)
         state = 2 // in evaluation
         what = evaler(what)
@@ -382,16 +412,20 @@ class Lazy(var what: W, val source: SourceInfo = UnknownSource) extends W {
     }
   }
 
-  // This might give inconsistent results due to threading
-  // but its not a big deal, as this is only used for debuggging
-  // and adding locks will cause deadlocks, as this method won't be
-  // using when evaluating a lazy statement
   override def toString = state match {
     case 0 => s"%L0[$what]"
     case 1 => s"%L1[$what]"
     case 2 => s"%L2[$what]"
     case 3 => what.toString
   }
+
+  override def getBoolean = get().getBoolean
+  override def getChar = get().getChar
+  override def getDict = get().getDict
+  override def getLong = get().getLong
+  override def getSymbol = get().getSymbol
+  override def getBuiltinFunctionName = get().getBuiltinFunctionName
+  override def getFunctionCall = get().getFunctionCall
 }
 
 

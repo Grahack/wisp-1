@@ -2,6 +2,7 @@
 
 
 $let
-	x 10
-	y 20
-	$num-add x y
+	' $quote
+	x $true
+	y $true
+	$trace ($type-of x) []

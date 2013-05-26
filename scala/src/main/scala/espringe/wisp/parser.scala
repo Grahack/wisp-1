@@ -61,7 +61,7 @@ object Parser extends Parsers {
       { case a ~ b => if (b.isDefined) FnCall(a, WList(b)) else a }
 
   private def charParser =
-    ('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => new WChar(x)))
+    ('~' ~> acceptIf(!special(_))("expected char, but found: " + _) ^^ (x => WChar(x)))
 
   private def listParser =
     ('(' ~> rep1sep(atomParser, singleSpace) ~< ')' ^^ (x => FnCall(x.head, WList(x.tail))))
@@ -87,13 +87,13 @@ object Parser extends Parsers {
   }
 
   // TODO: allow arbitrary base
-  private def numParser = (rep1(digitParser) ^^ (x => new Num(numberListToNumber(x, base = 10))))
+  private def numParser = (rep1(digitParser) ^^ (x => Num(numberListToNumber(x, base = 10))))
 
   private def digitParser: Parser[Int] =
     acceptIf(c => c.isDigit)(c => "Unexpected '" + c + "' when looking for a digit") ^^ (_.asDigit)
 
   private def symbolParser = (rep1(
-    acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ (x => new Sym(charListToSymbol(x))))
+    acceptIf(!special(_))(c => "Unexpected '" + c + "' when looking for symbol char")) ^^ (x => Sym(charListToSymbol(x))))
 
   private def special(c: Char) =
     c.isWhitespace || c.isControl ||
@@ -104,8 +104,7 @@ object Parser extends Parsers {
       c == '{' || c == '}' ||
       c == '$' || c == '\\'
 
-
-  private def literalStringParser = '"' ~> rep(insideLiteralParser ^^ (new WChar(_))) ~< '"' ^^
+  private def literalStringParser = '"' ~> rep(insideLiteralParser ^^ (WChar(_))) ~< '"' ^^
     { WList(_) }
 
   // TODO: allow string escaping
@@ -125,11 +124,11 @@ object Parser extends Parsers {
 
       import BuiltinFunctionNames._
 
-      val ls = LexicalSource("UnknownFile", x.pos.column, x.pos.line)
+      implicit val ls = LexicalSource("UnknownFile", x.pos.column, x.pos.line)
 
       x.str match {
-        case "true" => Bool(true, ls)
-        case "false" => Bool(false, ls)
+        case "true" => Bool(true)
+        case "false" => Bool(false)
         case fn =>
           BuiltinFunction(
             fn match {
@@ -174,8 +173,8 @@ object Parser extends Parsers {
               case "type-eq" => TypeEq
               case "type-of" => TypeOf
               case "vau" => Vau
-              case x => sys.error(s"During parsing, did not recognise builtin $x") 
-            }, ls)
+              case x => sys.error(s"During parsing, did not recognise builtin $x")
+            })
       }
 
     }
