@@ -32,8 +32,6 @@ sealed trait W {
   def asSym: Option[Symbol] = None
   def asType: Option[Primitives.Primitive] = None
 
-  def asString: Option[String] = None
-
   override def hashCode: Int = sys.error(s"Implementation misssing in $this")
   override def equals(o: Any): Boolean = sys.error(s"Implementation misssing in $this")
   override def toString = deparse
@@ -96,6 +94,7 @@ object ~: {
 
 sealed trait WList extends Iterable[W] with W {
   def mapW(f: W => W): WList
+  def asString: Option[String]
 }
 
 case class WEmpty(source: SourceInfo = UnknownSource) extends WList {
@@ -265,10 +264,8 @@ object BuiltinFunctionNames extends Enumeration {
 case class FnCall(func: W, args: WList, source: SourceInfo = UnknownSource) extends W {
   override def typeOf = Primitives.TypeApply
   override def deparse = hasOneArg.map(arg => func.deparse + "." + arg.deparse)
-   .getOrElse("(" + func.deparse + args.map(" " + _.deparse).mkString + ")")
-    
-    
-    
+    .getOrElse("(" + func.deparse + args.map(" " + _.deparse).mkString + ")")
+
   override def hashCode = "WApply".hashCode ^ func.hashCode ^ args.hashCode
   override def equals(o: Any) = o match {
     case FnCall(f, a, _) => func == f && args == a
@@ -339,3 +336,62 @@ case class BuiltinFunction(value: BuiltinFunctionNames.Name, source: SourceInfo 
     case _ => false
   }
 }
+
+class Lazy(var what: W, val source: SourceInfo = UnknownSource) extends W {
+
+  private var evaler: W => W = null
+  private var state: Char = 0
+  
+  def setEvaler(fn: W => W) {
+    synchronized {
+      assert(state == 0 && evaler == null)
+      evaler = fn
+      state = 1
+    }
+  }
+
+  override def deparse = get().deparse
+  override def typeOf = get().typeOf
+  override def asBuiltin: Option[BuiltinFunctionNames.Name] = get().asBuiltin
+  override def asBool: Option[Boolean] = get().asBool
+  override def asChar: Option[Char] = get().asChar
+  override def asDict: Option[Dict] = get().asDict
+  override def asFnCall: Option[FnCall] = get().asFnCall
+  override def asList: Option[Iterable[W]] = get().asList
+  override def asNum: Option[Long] = get().asNum
+  override def asSym: Option[Symbol] = get().asSym
+  override def asType: Option[Primitives.Primitive] = get().asType
+
+  override def hashCode: Int = sys.error(s"Implementation misssing in $this")
+  override def equals(o: Any): Boolean = sys.error(s"Implementation misssing in $this")
+
+  private def get() = synchronized {
+    state match {
+      case 0 => sys.error("Lazy object has not had evaler set yet")
+      case 1 => // in evaluation
+        assert(evaler != null)
+        state = 2 // in evaluation
+        what = evaler(what)
+        evaler = null // this is no longer needed, free the reference for gc
+        state = 3 // finished evaluation
+        what
+      case 2 => // in evaluation
+        sys.error(s"Trying to evaluate object $what while its been evaluated")
+      case 3 => // finished evaluation
+        what
+    }
+  }
+
+  // This might give inconsistent results due to threading
+  // but its not a big deal, as this is only used for debuggging
+  // and adding locks will cause deadlocks, as this method won't be
+  // using when evaluating a lazy statement
+  override def toString = state match {
+    case 0 => s"%L0[$what]"
+    case 1 => s"%L1[$what]"
+    case 2 => s"%L2[$what]"
+    case 3 => what.toString
+  }
+}
+
+

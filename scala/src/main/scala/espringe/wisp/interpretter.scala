@@ -113,16 +113,22 @@ class Interpretter(dir: java.io.File) {
             case Let =>
               require(!rawArgs.isEmpty, "Let expect a list of bindings, and the a final statement")
 
-              val finalEnv = rawArgs.init.foldLeft(e) { (newEnv, binding) =>
-                binding match {
-                  case FnCall(sym, bindee ~: WNil(), _) =>
-                    require(!newEnv.contains(sym), s"In let, trying to rebind $sym in $fnCall where the env is $newEnv")
-                    newEnv + ((sym, eval(newEnv, bindee)))
-                  case x => sys.error(s"Let required a binding to be [Symbol Expression] but found $x in $fnCall")
+              val results = rawArgs.init.map {
+                _ match {
+                  case FnCall(sym: Sym, bindee ~: WNil(), _) =>
+                    (sym, new Lazy(bindee)) // An large optimization will be to only do this for FnCall's and Symbols
+                  case x => sys.error(s"Let required a binding to be (Symbol Expression) but found $x in $fnCall")
                 }
               }
 
-              eval(finalEnv, rawArgs.last) // and for our tail call
+              val newEnv = e ++ results
+
+              // All Lazy bindings have been initialized with an environment, now we need to make one
+              results.foreach {
+                case (_, l: Lazy) => l.setEvaler(eval(newEnv, _))
+              }
+
+              eval(newEnv, rawArgs.last) // and for our tail call
             case ListCons =>
               val WEval(l) ~: WEval(e) ~: WNil() = rawArgs
               l match {
@@ -187,7 +193,7 @@ class Interpretter(dir: java.io.File) {
               val a ~: WNil() = rawArgs
               a
             case ReadFile =>
-              val WEval(str) ~: WNil() = rawArgs
+              val str @ ListEval(_) ~: WNil() = rawArgs
               val fileName = str.asString.getOrElse(sys.error(s"#ReadFile expected a string (a list of chars) but got $str"))
               WList(io.Source.fromFile(new java.io.File(dir, fileName)).toStream.map(WChar(_)))
             case SymEq =>
