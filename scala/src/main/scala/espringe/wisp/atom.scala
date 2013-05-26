@@ -14,7 +14,7 @@ sealed trait W {
   def getFunctionCall: Option[(W, WList)] = None
   def getLong: Option[Long] = None
   def getSymbol: Option[Symbol] = None
-  def getBuiltinFunctionName: Option[BuiltinFunctionNames.Name] = None
+  def getBuiltinFunctionName: Option[BuiltinFunction.Name] = None
 
   override def hashCode: Int = sys.error(s"Implementation misssing in $this")
   override def equals(o: Any): Boolean = sys.error(s"Implementation misssing in $this")
@@ -38,7 +38,6 @@ class Bool(val value: Boolean, val source: SourceInfo) extends W {
 
   override def getBoolean = Some(value)
 }
-
 
 object WChar {
   def apply(value: Char)(implicit source: SourceInfo) = new WChar(value, source)
@@ -118,7 +117,7 @@ object WNil extends WList {
 }
 
 object WCons {
-  def apply(head: W, rest: => WList)(implicit source: SourceInfo) = new WCons(head, rest, source) 
+  def apply(head: W, rest: => WList)(implicit source: SourceInfo) = new WCons(head, rest, source)
 }
 
 class WCons(override val head: W, rest: => WList, val source: SourceInfo) extends WList {
@@ -255,6 +254,20 @@ case class UDF(capEnv: WDict, arg: Sym, env: Sym, capCode: W)(implicit val sourc
 object Primitives extends Enumeration {
   type Primitive = Value
   val TypeApply, TypeBool, TypeChar, TypeSym, TypeNum, TypeDict, TypeBuiltin, TypeFunc, TypeList, TypeType = Value
+
+  def unapply(s: String) = s match {
+    case "type-apply" => Some(TypeApply)
+    case "type-bool" => Some(TypeBool)
+    case "type-char" => Some(TypeChar)
+    case "type-sym" => Some(TypeSym)
+    case "type-num" => Some(TypeNum)
+    case "type-dict" => Some(TypeDict)
+    case "type-builtin" => Some(TypeBuiltin)
+    case "type-func" => Some(TypeFunc)
+    case "type-list" => Some(TypeList)
+    case "type-type" => Some(TypeType)
+    case _ => None
+  }
 }
 
 case class WType(value: Primitives.Primitive)(implicit val source: SourceInfo) extends W {
@@ -280,18 +293,61 @@ case class WType(value: Primitives.Primitive)(implicit val source: SourceInfo) e
   }
 }
 
-object BuiltinFunctionNames extends Enumeration {
+object BuiltinFunction extends Enumeration {
   type Name = Value
   val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, FnCallArgs, FnCallFn, FnCallMake, If, Let, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Then, Trace, TypeEq, TypeOf, Vau = Value
-}
 
-object BuiltinFunction {
-  def apply(value: BuiltinFunctionNames.Name)(implicit source: SourceInfo) = new BuiltinFunction(value, source)
+  def apply(value: Name)(implicit source: SourceInfo) = new BuiltinFunction(value, source)
   def unapply(value: W) = value.getBuiltinFunctionName
+
+  def unapply(s: String) = s match {
+    case "bool-eq" => Some(BoolEq)
+    case "bool-not" => Some(BoolNot)
+    case "dict-contains" => Some(DictContains)
+    case "dict-get" => Some(DictGet)
+    case "dict-insert" => Some(DictInsert)
+    case "dict-make" => Some(DictMake)
+    case "dict-remove" => Some(DictRemove)
+    case "dict-size" => Some(DictSize)
+    case "dict-to-list" => Some(DictToList)
+    case "error" => Some(Error)
+    case "eval" => Some(Eval)
+    case "fn-call-args" => Some(FnCallArgs)
+    case "fn-call-fn" => Some(FnCallFn)
+    case "fn-call-make" => Some(FnCallMake)
+    case "if" => Some(If)
+    case "let" => Some(Let)
+    case "list-cons" => Some(ListCons)
+    case "list-head" => Some(ListHead)
+    case "list-empty?" => Some(ListIsEmpty)
+    case "list-make" => Some(ListMake)
+    case "list-tail" => Some(ListTail)
+    case "num-add" => Some(NumAdd)
+    case "num-div" => Some(NumDiv)
+    case "num-eq" => Some(NumEq)
+    case "num-gt" => Some(NumGT)
+    case "num-gte" => Some(NumGTE)
+    case "num-lt" => Some(NumLT)
+    case "num-lte" => Some(NumLTE)
+    case "num-mult" => Some(NumMult)
+    case "num-sub" => Some(NumSub)
+    case "num-to-char-list" => Some(NumToCharList)
+    case "parse" => Some(Parse)
+    case "quote" => Some(Quote)
+    case "read-file" => Some(ReadFile)
+    case "sym-eq" => Some(SymEq)
+    case "sym-to-char-list" => Some(SymToCharList)
+    case "then" => Some(Then)
+    case "trace" => Some(Trace)
+    case "type-eq" => Some(TypeEq)
+    case "type-of" => Some(TypeOf)
+    case "vau" => Some(Vau)
+    case _ => None
+  }
 }
 
-class BuiltinFunction(val value: BuiltinFunctionNames.Name, val source: SourceInfo) extends W {
-  import BuiltinFunctionNames._
+class BuiltinFunction(val value: BuiltinFunction.Name, val source: SourceInfo) extends W {
+  import BuiltinFunction._
 
   override def deparse = value match {
     case BoolEq => "$bool-eq"
@@ -340,8 +396,8 @@ class BuiltinFunction(val value: BuiltinFunctionNames.Name, val source: SourceIn
 
   override def hashCode = value.hashCode
   override def equals(o: Any) = o match {
-    case BuiltinFunction(bf) => value == bf
-    case n: BuiltinFunctionNames.Name => value == n
+    case bf: BuiltinFunction => value == bf.value
+    case n: BuiltinFunction.Name => value == n
     case _ => false
   }
 

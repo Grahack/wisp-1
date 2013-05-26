@@ -122,61 +122,17 @@ object Parser extends Parsers {
   private def builtInSymbolParser: Parser[W] = positioned('$' ~> rep1(nonSpecialChar) ^^ (x => PositionalString(x.mkString))) ^^
     { x =>
 
-      import BuiltinFunctionNames._
+      import BuiltinFunction._
 
       implicit val ls = LexicalSource("UnknownFile", x.pos.column, x.pos.line)
 
       x.str match {
         case "true" => Bool(true)
         case "false" => Bool(false)
-        case fn =>
-          BuiltinFunction(
-            fn match {
-              case "bool-eq" => BoolEq
-              case "bool-not" => BoolNot
-              case "dict-contains" => DictContains
-              case "dict-get" => DictGet
-              case "dict-insert" => DictInsert
-              case "dict-make" => DictMake
-              case "dict-remove" => DictRemove
-              case "dict-size" => DictSize
-              case "dict-to-list" => DictToList
-              case "error" => BuiltinFunctionNames.Error
-              case "eval" => Eval
-              case "fn-call-args" => FnCallArgs
-              case "fn-call-fn" => FnCallFn
-              case "fn-call-make" => FnCallMake
-              case "if" => If
-              case "let" => Let
-              case "list-cons" => ListCons
-              case "list-head" => ListHead
-              case "list-empty?" => ListIsEmpty
-              case "list-make" => ListMake
-              case "list-tail" => ListTail
-              case "num-add" => NumAdd
-              case "num-div" => NumDiv
-              case "num-eq" => NumEq
-              case "num-gt" => NumGT
-              case "num-gte" => NumGTE
-              case "num-lt" => NumLT
-              case "num-lte" => NumLTE
-              case "num-mult" => NumMult
-              case "num-sub" => NumSub
-              case "num-to-char-list" => NumToCharList
-              case "parse" => Parse
-              case "quote" => Quote
-              case "read-file" => ReadFile
-              case "sym-eq" => SymEq
-              case "sym-to-char-list" => SymToCharList
-              case "then" => Then
-              case "trace" => Trace
-              case "type-eq" => TypeEq
-              case "type-of" => TypeOf
-              case "vau" => Vau
-              case x => sys.error(s"During parsing, did not recognise builtin $x")
-            })
+        case Primitives(value) => WType(value)
+        case BuiltinFunction(value) => BuiltinFunction(value)
+        case x => sys.error(s"During parsing, did not recognise builtin $x")
       }
-
     }
 
   private def eol = elem('\n') // probably should support windows-endline, but meh

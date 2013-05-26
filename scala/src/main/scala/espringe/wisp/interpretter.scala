@@ -13,7 +13,7 @@ class Interpretter(dir: java.io.File) {
       def unapply(value: W) = Some(eval(e, value))
     }
 
-    import BuiltinFunctionNames._
+    import BuiltinFunction._
 
     form match {
       case s: Sym => {

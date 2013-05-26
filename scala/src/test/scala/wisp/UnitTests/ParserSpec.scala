@@ -8,7 +8,7 @@ import java.io.PrintWriter
 
 class ParserSpec extends Specification {
 
-  import BuiltinFunctionNames._
+  import BuiltinFunction._
 
   "The Parser" should {
 
