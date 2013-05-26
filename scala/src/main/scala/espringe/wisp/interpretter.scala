@@ -49,7 +49,7 @@ class Interpretter(dir: java.io.File) {
       case fnCall @ FnCall(WEval(fn), rawArgs, _) =>
         def from = new ComputedSource(fnCall)
         def evaledArgs = rawArgs.mapW(eval(e, _))
-        
+
         fn match { // in order to tail call if/eval, can't just dynamic-dispatch out
           case UDF(capEnv, argS, envS, capCode, _) =>
             eval(capEnv + (Sym(argS) -> rawArgs) + (Sym(envS) -> WDict(e)), capCode)
@@ -110,6 +110,19 @@ class Interpretter(dir: java.io.File) {
             case If =>
               val BoolEval(cond) ~: trueCase ~: falseCase ~: WNil() = rawArgs
               eval(e, if (cond) trueCase else falseCase)
+            case Let =>
+              require(!rawArgs.isEmpty, "Let expect a list of bindings, and the a final statement")
+
+              val finalEnv = rawArgs.init.foldLeft(e) { (newEnv, binding) =>
+                binding match {
+                  case FnCall(sym, bindee ~: WNil(), _) =>
+                    require(!newEnv.contains(sym), s"In let, trying to rebind $sym in $fnCall where the env is $newEnv")
+                    newEnv + ((sym, eval(newEnv, bindee)))
+                  case x => sys.error(s"Let required a binding to be [Symbol Expression] but found $x in $fnCall")
+                }
+              }
+
+              eval(finalEnv, rawArgs.last) // and for our tail call
             case ListCons =>
               val WEval(l) ~: WEval(e) ~: WNil() = rawArgs
               l match {
@@ -156,7 +169,7 @@ class Interpretter(dir: java.io.File) {
               rawArgs match {
                 case NumEval(a) ~: NumEval(b) ~: WNil() => Bool(a <= b)
                 case x => sys.error(s"#num-lte expected 2 numbers, instead got: $x in $fnCall")
-              }              
+              }
             case NumMult =>
               val NumEval(a) ~: NumEval(b) ~: WNil() = rawArgs
               Num(a * b)

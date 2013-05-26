@@ -148,6 +148,7 @@ object Parser extends Parsers {
               case "fn-call-fn" => FnCallFn
               case "fn-call-make" => FnCallMake
               case "if" => If
+              case "let" => Let
               case "list-cons" => ListCons
               case "list-head" => ListHead
               case "list-empty?" => ListIsEmpty

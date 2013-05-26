@@ -40,7 +40,7 @@ sealed trait W {
 }
 
 case class Bool(value: Boolean, source: SourceInfo = UnknownSource) extends W {
-  override def deparse = if (value) "#true" else "#false"
+  override def deparse = if (value) "$true" else "$false"
   override def typeOf = Primitives.TypeBool
   override def asBool = Some(value)
   override def hashCode = value.hashCode
@@ -232,7 +232,7 @@ case class Sym(value: Symbol, source: SourceInfo = UnknownSource) extends W {
 }
 
 case class UDF(capEnv: Dict, arg: Symbol, env: Symbol, capCode: W, source: SourceInfo = UnknownSource) extends W {
-  override def deparse = "#UDF#"
+  override def deparse = "$UDF$"
   override def typeOf = Primitives.TypeFunc
   override def hashCode = capEnv.hashCode ^ arg.hashCode ^ env.hashCode ^ capCode.hashCode
   override def equals(o: Any) = o match {
@@ -259,7 +259,7 @@ case class WType(value: Primitives.Primitive, source: SourceInfo = UnknownSource
 
 object BuiltinFunctionNames extends Enumeration {
   type Name = Value
-  val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, FnCallArgs, FnCallFn, FnCallMake, If, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Then, Trace, TypeEq, TypeOf, Vau = Value
+  val BoolEq, BoolNot, DictContains, DictGet, DictInsert, DictMake, DictRemove, DictSize, DictToList, Error, Eval, FnCallArgs, FnCallFn, FnCallMake, If, Let, ListCons, ListHead, ListIsEmpty, ListMake, ListTail, NumAdd, NumDiv, NumEq, NumGT, NumGTE, NumLT, NumLTE, NumMult, NumSub, NumToCharList, Parse, Quote, ReadFile, SymEq, SymToCharList, Then, Trace, TypeEq, TypeOf, Vau = Value
 }
 
 case class FnCall(func: W, args: WList, source: SourceInfo = UnknownSource) extends W {
@@ -287,45 +287,46 @@ case class BuiltinFunction(value: BuiltinFunctionNames.Name, source: SourceInfo 
   import BuiltinFunctionNames._
 
   override def deparse = value match {
-    case BoolEq => "#bool-eq"
-    case BoolNot => "#bool-not"
-    case DictContains => "#dict-contains"
-    case DictGet => "#dict-get"
-    case DictMake => "#dict-make"
-    case DictInsert => "#dict-insert"
-    case DictRemove => "#dict-remove"
-    case DictSize => "#dict-size"
-    case DictToList => "#dict-list"
-    case Error => "#error"
-    case Eval => "#eval"
-    case FnCallArgs => "#fn-call-args"
-    case FnCallFn => "#fn-call-fn"
-    case FnCallMake => "#fn-call-make"
-    case If => "#if"
-    case ListCons => "#list-cons"
-    case ListHead => "#list-head"
-    case ListIsEmpty => "#list-empty?"
-    case ListMake => "#list-make"
-    case ListTail => "#list-tail"
-    case NumAdd => "#num-add"
-    case NumDiv => "#num-div"
-    case NumEq => "#num-eq"
-    case NumGT => "#num-gt"
-    case NumGTE => "#num-gte"
-    case NumLT => "#num-lt"
-    case NumLTE => "#num-lte"
-    case NumMult => "#num-mult"
-    case NumSub => "#num-sub"
-    case NumToCharList => "#num-to-char-list"
-    case Parse => "#parse"
-    case Quote => "#quote"
-    case ReadFile => "#read-file"
-    case SymEq => "#sym-eq"
-    case SymToCharList => "#sym-eq"
-    case Trace => "#trace"
-    case TypeEq => "#type-eq"
-    case TypeOf => "#type-of"
-    case Vau => "#vau"
+    case BoolEq => "$bool-eq"
+    case BoolNot => "$bool-not"
+    case DictContains => "$dict-contains"
+    case DictGet => "$dict-get"
+    case DictMake => "$dict-make"
+    case DictInsert => "$dict-insert"
+    case DictRemove => "$dict-remove"
+    case DictSize => "$dict-size"
+    case DictToList => "$dict-list"
+    case Error => "$error"
+    case Eval => "$eval"
+    case FnCallArgs => "$fn-call-args"
+    case FnCallFn => "$fn-call-fn"
+    case FnCallMake => "$fn-call-make"
+    case If => "$if"
+    case Let => "$let"
+    case ListCons => "$list-cons"
+    case ListHead => "$list-head"
+    case ListIsEmpty => "$list-empty?"
+    case ListMake => "$list-make"
+    case ListTail => "$list-tail"
+    case NumAdd => "$num-add"
+    case NumDiv => "$num-div"
+    case NumEq => "$num-eq"
+    case NumGT => "$num-gt"
+    case NumGTE => "$num-gte"
+    case NumLT => "$num-lt"
+    case NumLTE => "$num-lte"
+    case NumMult => "$num-mult"
+    case NumSub => "$num-sub"
+    case NumToCharList => "$num-to-char-list"
+    case Parse => "$parse"
+    case Quote => "$quote"
+    case ReadFile => "$read-file"
+    case SymEq => "$sym-eq"
+    case SymToCharList => "$sym-eq"
+    case Trace => "$trace"
+    case TypeEq => "$type-eq"
+    case TypeOf => "$type-of"
+    case Vau => "$vau"
 
   }
   override def typeOf = Primitives.TypeBuiltIn
