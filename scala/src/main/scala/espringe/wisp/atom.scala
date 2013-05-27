@@ -71,6 +71,9 @@ class WDict(val value: Dict, val source: SourceInfo) extends W {
     case _ => false
   }
   override def getDict = Some(value)
+  
+  
+  override def toString = s"{dict of size: ${value.size}}"
 }
 
 object WList {
@@ -95,7 +98,7 @@ sealed trait WList extends Iterable[W] with W {
 }
 
 object WNil extends WList {
-  override def source = new SourceInfo { override def print = "global nil" }
+  override def source = NilSource
 
   def unapply(xs: WList): Boolean = xs.isInstanceOf[WNil.type]
 
@@ -436,6 +439,7 @@ class Lazy(var what: W)(implicit val source: SourceInfo) extends W {
 
   private var evaler: W => W = null
   private var state: Char = 0
+  
 
   def setEvaler(fn: W => W) {
     synchronized {
@@ -467,6 +471,11 @@ class Lazy(var what: W)(implicit val source: SourceInfo) extends W {
         what
     }
   }
+  
+  // left means unevaled
+  def info: Either[W, W] = {
+    if (state != 3) Left(what) else Right(what)
+  } 
 
   override def toString = state match {
     case 0 => s"%L0[$what]"

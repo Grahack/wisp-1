@@ -6,13 +6,7 @@ class Interpretter(dir: java.io.File) {
 
   def apply(form: W): W = eval(WDict(), form)
 
-  def eval(e: WDict, form: W): W = {
-
-    object X {
-      def apply(value: W) = eval(e, value)
-      def unapply(value: W) = Some(eval(e, value))
-    }
-
+  private def eval(e: WDict, form: W): W = try {
     import BuiltinFunction._
 
     form match {
@@ -20,11 +14,11 @@ class Interpretter(dir: java.io.File) {
         require(e.value.contains(s), s"Could not find $s in environment $e")
         e.value(s)
       }
-      case fnCall @ FnCall(X(fn), rawArgs) =>
+      case fnCall @ FnCall(fn, rawArgs) =>
         implicit def from = new ComputedSource(fnCall)
         def evaledArgs = rawArgs.mapW(eval(e, _))
 
-        fn match { // in order to tail call if/eval, can't just dynamic-dispatch out
+        eval(e, fn) match { // in order to tail call if/eval, can't just dynamic-dispatch out
           case UDF(capEnv, argS, envS, capCode) =>
             val newEnv = WDict(capEnv.value + (argS -> rawArgs) + (envS -> e))
             eval(newEnv, capCode)
@@ -63,38 +57,42 @@ class Interpretter(dir: java.io.File) {
                 require(d.contains(k), s"Dictionary $d must contain $k in order to remove it, in $fnCall")
                 WDict(d - k)
             }
-            case DictSize =>
-              val X(WDict(d)) ~: WNil = rawArgs
-              Num(d.size)
-            case DictToList =>
-              val X(WDict(d)) ~: WNil = rawArgs
-              WList(d.toSeq.map { case (k, v) => WList(Seq(k, v)) })
+            case DictSize => evaledArgs match {
+              case WDict(d) ~: WNil => Num(d.size)
+            }
+            case DictToList => evaledArgs match {
+              case WDict(d) ~: WNil => WList(d.map { case (k, v) => WList(Seq(k, v)) })
+            }
             case Error =>
-              val err = rawArgs.map(eval(e, _)).mkString(" ")
+              val err = evaledArgs.map(_.deparse).mkString(" ")
               sys.error(s"Fatal error $err triggered by $fnCall")
             case Eval =>
               rawArgs match {
                 case inEnv ~: nForm ~: WNil =>
                   eval(e, inEnv) match {
                     case d: WDict => eval(d, nForm)
-                    case x => sys.error(s"eval expected a Dict for first argument, instead found $x in $fnCall")
+                    case x => sys.error(s"eval expected a dict for first argument, instead found $x in $fnCall")
                   }
                 case x => sys.error(s"eval expected two arguments, a dictionary and what to evaluate, instead found $x in $fnCall")
               }
-            case FnCallArgs =>
-              val X(FnCall(fnc, args)) ~: WNil = rawArgs
-              args
-            case FnCallFn =>
-              val X(FnCall(fnc, args)) ~: WNil = rawArgs
-              fnc
-            case FnCallMake =>
-              rawArgs match {
-                case X(fnc) ~: X(args: WList) ~: WNil => FnCall(fnc, WList(args))
-                case x => sys.error(s"#fn-call-make expected two arguments a function and a list, instead got: $x in $fnCall")
-              }
-            case If =>
-              val X(Bool(c)) ~: trueCase ~: falseCase ~: WNil = rawArgs
-              X(if (c) trueCase else falseCase)
+            case FnCallArgs => evaledArgs match {
+              case FnCall(_, args) => args
+            }
+            case FnCallFn => evaledArgs match {
+              case FnCall(fn, _) => fn
+            }
+            case FnCallMake => evaledArgs match {
+              case fn ~: (args: WList) ~: WNil => FnCall(fn, WList(args))
+              case x => sys.error(s"#fn-call-make expected two arguments a function and a list, instead got: $x in $fnCall")
+            }
+            case If => rawArgs match {
+              case cond ~: trueCase ~: falseCase ~: WNil =>
+                eval(e, cond) match {
+                  case Bool(b) => eval(e, if (b) trueCase else falseCase)
+                  case x => sys.error(s"The condition in if must be a boolean, found $x in $fnCall")
+                }
+              case x => sys.error(s"if expects [cond true false] but found $x in $fnCall")
+            }
             case Let =>
               require(!rawArgs.isEmpty, "Let expect a list of bindings, and the a final statement")
 
@@ -103,103 +101,113 @@ class Interpretter(dir: java.io.File) {
                 case x => sys.error(s"Expected (sym value) but found $x in $fnCall")
               })
 
-              val (lb, normalBindings) = bindings.partition(_ => true)
+              val (lb, normalBindings) = bindings.partition { case (_, b) => b.isInstanceOf[FnCall] || b.isInstanceOf[Sym] }
 
-              val lazyBindings = lb.map { case (s, v) => s -> new Lazy(v) }
+              val lazyBindings = lb.map { case (s, v) => (s, new Lazy(v)) }
 
               val newEnv = WDict(e.value ++ lazyBindings ++ normalBindings)
 
               lazyBindings.foreach { case (_, fc) => fc.setEvaler(eval(newEnv, _)) }
 
+              // A big optimization here would be to resolve all symbols (when possible)
+
               eval(newEnv, rawArgs.last)
-            case ListCons =>
-              val X(l) ~: X(e) ~: WNil = rawArgs
-              l match {
-                case l: WList => WCons(e, l)
-                case x => sys.error(s"Can't cons onto non-list: $l in $fnCall")
-              }
-            case ListHead =>
-              evaledArgs match {
-                case (l ~: _) ~: WNil => l
-                case x => sys.error(s"#list-head expected a non-empty list, instead found $x in $fnCall")
-              }
-            case ListIsEmpty =>
-              val X(l: WList) ~: WNil = rawArgs
-              Bool(l.isEmpty)
-            case ListMake =>
-              WList(rawArgs.map(eval(e, _)))
-            case ListTail =>
-              val X(l) ~: WNil = rawArgs
-              l match {
-                case _ ~: tail => tail
-                case WNil => sys.error(s"Can't call tail on empty list in $fnCall")
-                case x => sys.error("Can't call tail on non-list $x in $fnCall")
-              }
-            case NumAdd =>
-              val X(Num(a)) ~: X(Num(b)) ~: WNil = rawArgs
-              Num(a + b)
-            case NumDiv =>
-              val X(Num(a)) ~: X(Num(b)) ~: WNil = rawArgs
-              require(b != 0, s"Divisor was zero in $fn")
-              Num(a / b)
-            case NumEq =>
-              val X(Num(a)) ~: X(Num(b)) ~: WNil = rawArgs
-              Bool(a == b)
-            case NumGT =>
-              val X(Num(a)) ~: X(Num(b)) ~: WNil = rawArgs
-              Bool(a > b)
-            case NumGTE =>
-              val X(Num(a)) ~: X(Num(b)) ~: WNil = rawArgs
-              Bool(a >= b)
-            case NumLT =>
-              val X(Num(a)) ~: X(Num(b)) ~: WNil = rawArgs
-              Bool(a < b)
-            case NumLTE =>
-              rawArgs match {
-                case X(Num(a)) ~: X(Num(b)) ~: WNil => Bool(a <= b)
-                case x => sys.error(s"#num-lte expected 2 numbers, instead got: $x in $fnCall")
-              }
-            case NumMult => evaledArgs match {
-              case Num(a) ~: Num(b) ~: WNil =>
-                Num(a * b)
+            case ListCons => evaledArgs match {
+              case (l: WList) ~: e ~: WNil => WCons(e, l)
+              case x => sys.error(s"Can't cons, expect [list value] got $x in $fnCall")
             }
-            case NumSub =>
-              val X(Num(a)) ~: X(Num(b)) ~: WNil = rawArgs
-              Num(a - b)
-            case NumToCharList =>
-              val X(Num(a)) ~: WNil = rawArgs
-              WList(a.toString.map(WChar(_)))
-            case Parse =>
-              val X(letters: WList) ~: WNil = rawArgs
-              val asString = letters.asString.getOrElse(sys.error(s"Could not treat $letters as a string for parse in $fnCall"))
-              WList(Parser(asString))
-            case Quote =>
-              val a ~: WNil = rawArgs
-              a
-            case ReadFile =>
-              val X(str: WList) ~: WNil = rawArgs
-              val fileName = str.asString.getOrElse(sys.error(s"ReadFile expected a string (a list of chars) but got $str in $fnCall"))
-              WList(io.Source.fromFile(new java.io.File(dir, fileName)).toStream.map(WChar(_)))
-            case SymEq =>
-              val X(Sym(a)) ~: X(Sym(b)) ~: WNil = rawArgs
-              Bool(a == b)
-            case SymToCharList =>
-              val X(Sym(a)) ~: WNil = rawArgs
-              WList(a.name.map(WChar(_)))
-            case Then =>
-              val X(_) ~: second ~: WNil = rawArgs
-              eval(e, second) // to be a tail call
+            case ListHead => evaledArgs match {
+              case (l ~: _) ~: WNil => l
+              case x => sys.error(s"list-head expected a non-empty list, instead found $x in $fnCall")
+            }
+            case ListIsEmpty => evaledArgs match {
+              case (l: WList) ~: WNil => Bool(l.isEmpty)
+            }
+            case ListMake => WList(evaledArgs)
+            case ListTail => evaledArgs match {
+              case (_ ~: tail) ~: WNil => tail
+              case x => sys.error(s"Expected a non-empty list, but found $x in $fnCall")
+            }
+            case NumAdd => evaledArgs match {
+              case Num(a) ~: Num(b) ~: WNil => Num(a + b)
+              case x => sys.error(s"num-add expected [Num Num] but found $x in $fnCall")
+            }
+            case NumDiv => evaledArgs match {
+              case Num(a) ~: Num(b) ~: WNil if b != 0 => Num(a / b)
+              case x => sys.error(s"num-div expected [Num Num] (with nonzero divisor), found: $x in $fnCall")
+            }
+            case NumEq => evaledArgs match {
+              case Num(a) ~: Num(b) ~: WNil => Bool(a == b)
+              case x => sys.error(s"num-eq expected [Num Num] but found $x in $fnCall")
+            }
+            case NumGT => evaledArgs match {
+              case Num(a) ~: Num(b) ~: WNil => Bool(a > b)
+              case x => sys.error(s"num-gt expected [Num Num] but found $x in $fnCall")
+            }
+            case NumGTE => evaledArgs match {
+              case Num(a) ~: Num(b) ~: WNil => Bool(a >= b)
+              case x => sys.error(s"num-gte expected [Num Num] but found $x in $fnCall")
+            }
+            case NumLT => evaledArgs match {
+              case Num(a) ~: Num(b) ~: WNil => Bool(a < b)
+              case x => sys.error(s"num-lt expected [Num Num] but found $x in $fnCall")
+            }
+            case NumLTE => evaledArgs match {
+              case Num(a) ~: Num(b) ~: WNil => Bool(a <= b)
+              case x => sys.error(s"num-lte expected [Num Num] but found $x in $fnCall")
+            }
+            case NumMult => evaledArgs match {
+              case Num(a) ~: Num(b) ~: WNil => Num(a * b)
+              case x => sys.error("num-mult expected [Num Num] but found $x in $fnCall")
+            }
+            case NumSub => evaledArgs match {
+              case Num(a) ~: Num(b) ~: WNil => Num(a - b)
+              case x => sys.error(s"num-sub expected [Num Num] but found $x in $fnCall")
+            }
+            case NumToCharList => evaledArgs match {
+              case Num(a) ~: WNil => WList(a.toString.map(WChar(_)))
+              case x => sys.error(s"num-to-char-list expected [Num] but found $x in $fnCall")
+            }
+            case Parse => evaledArgs match {
+              case (letters: WList) ~: WNil =>
+                val asString = letters.asString.getOrElse(sys.error(s"Could not treat $letters as a string for parse in $fnCall"))
+                WList(Parser(asString))
+              case x => sys.error(s"parse expected a list of characters, instead found $x in $fnCall")
+            }
+            case Quote => rawArgs match {
+              case a ~: WNil => a
+              case x => sys.error(s"quote expected a single argument, found $x in $fnCall")
+            }
+            case ReadFile => evaledArgs match {
+              case (str: WList) ~: WNil =>
+                val fileName = str.asString.getOrElse(sys.error(s"ReadFile expected a string (a list of chars) but got $str in $fnCall"))
+                WList(io.Source.fromFile(new java.io.File(dir, fileName)).toStream.map(WChar(_)))
+            }
+            case SymEq => evaledArgs match {
+              case Sym(a) ~: Sym(b) ~: WNil => Bool(a == b)
+              case x => sys.error("sym-eq expected [Sym Sym] but found $x in $fnCall")
+            }
+            case SymToCharList => evaledArgs match {
+              case Sym(a) ~: WNil => WList(a.name.map(WChar(_)))
+              case x => sys.error(s"sym-to-char-list expected a single symbol, found $x in $fnCall")
+            }
+            case Then => rawArgs match { // TODO: should this function exist?
+              case a ~: b ~: WNil =>
+                eval(e, a)
+                eval(e, b) // to be a tail call
+              case x => sys.error(s"then expected two arguments, but found $x in $fnCall")
+            }
             case Trace =>
               require(!rawArgs.isEmpty, s"Can not #trace nothing, in $fnCall")
               val results = rawArgs.map(eval(e, _))
               println(results.map(_.deparse).mkString(" "))
               results.last
-            case TypeEq =>
-              val X(a) ~: X(b) ~: WNil = rawArgs
-              Bool(a.typeOf == b.typeOf)
-            case TypeOf =>
-              val X(a) ~: WNil = rawArgs
-              WType(a.typeOf)
+            case TypeEq => evaledArgs match {
+              case a ~: b ~: WNil => Bool(a.typeOf == b.typeOf)
+            }
+            case TypeOf => evaledArgs match {
+              case a ~: WNil => WType(a.typeOf)
+            }
             case Vau =>
               rawArgs match {
                 case (aS: Sym) ~: (eS: Sym) ~: code ~: WNil =>
@@ -217,6 +225,18 @@ class Interpretter(dir: java.io.File) {
       case x => x
     }
 
+  } catch {
+    case ex: Throwable =>
+      System.err.println(ex.getStackTraceString);
+      System.err.println(s"\nException $ex was thrown")
+      System.err.println("\n..dumping core to wisp-core.txt")
+
+      val pw = new java.io.PrintWriter("wisp-core.txt")
+      pw.write(CoreDump(form))
+      pw.close()
+
+      System.exit(-1)
+      ???
   }
 
 }
