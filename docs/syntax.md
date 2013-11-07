@@ -98,7 +98,7 @@ q
 
 If you got `(q (a c foo) (44 1 ("chicken" 343)))` then congratulate yourself, you're now an expert!
 
-Convience Lists:
+Convenience Lists:
 ========
 
 Often you would need to write `(#VectMake 1 2 3)` to make something that evaluates to a list of three elements. A convience syntax for this is: `[1 2 3]`. The reader reads it identically to as if you wrote `(#VectMake 1 2 3)`
